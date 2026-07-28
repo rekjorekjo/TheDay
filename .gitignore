@@ -22,6 +22,9 @@ tools/
 *.apk
 *.aab
 
+# Release output
+/dist/
+
 # Signing secrets
 *.jks
 *.keystore
