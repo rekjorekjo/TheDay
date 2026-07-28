@@ -5,6 +5,14 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg_midnight">
 
+    <ImageView
+        android:id="@+id/widget_background_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/widget_content"
         android:layout_width="match_parent"

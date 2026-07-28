@@ -156,6 +156,22 @@ class DayWidgetProvider : AppWidgetProvider() {
                 backgroundFor(settings.paletteStyle),
             )
 
+            val widgetBitmap = event?.backgroundImage?.let { image ->
+                WidgetImageRenderer.render(
+                    context = context,
+                    image = image,
+                    widthDp = size.widthDp,
+                    heightDp = size.heightDp,
+                )
+            }
+
+            if (widgetBitmap != null) {
+                views.setImageViewBitmap(R.id.widget_background_image, widgetBitmap)
+                views.setViewVisibility(R.id.widget_background_image, View.VISIBLE)
+            } else {
+                views.setViewVisibility(R.id.widget_background_image, View.GONE)
+            }
+
             if (event == null) {
                 views.setTextViewText(R.id.widget_title, context.getString(R.string.app_name))
                 views.setViewVisibility(R.id.widget_relation, View.GONE)
