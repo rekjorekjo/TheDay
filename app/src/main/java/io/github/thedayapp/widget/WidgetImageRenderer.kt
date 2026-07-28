@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
@@ -83,11 +84,13 @@ internal object WidgetImageRenderer {
                 targetHeight.toFloat() / heightPx.toFloat(),
             )
             val cornerRadius = 24f * density * outputScale
-            canvas.clipRoundRect(
-                RectF(0f, 0f, targetWidth.toFloat(), targetHeight.toFloat()),
-                cornerRadius,
-                cornerRadius,
-            )
+
+            val clipBounds = RectF(0f, 0f, targetWidth.toFloat(), targetHeight.toFloat())
+            val clipPath = Path().apply {
+                addRoundRect(clipBounds, cornerRadius, cornerRadius, Path.Direction.CW)
+            }
+            val saveCount = canvas.save()
+            canvas.clipPath(clipPath)
 
             val targetAspectRatio = targetWidth.toFloat() / targetHeight
             val sourceAspectRatio = decodedBitmap.width.toFloat() / decodedBitmap.height
@@ -150,6 +153,8 @@ internal object WidgetImageRenderer {
                 shader = gradient
             }
             canvas.drawRect(0f, 0f, targetWidth.toFloat(), targetHeight.toFloat(), gradientPaint)
+
+            canvas.restoreToCount(saveCount)
 
             val result = outputBitmap
             outputBitmap = null

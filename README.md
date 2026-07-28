@@ -1,22 +1,53 @@
 # The Day
 
-一个克制、庄重、纯本地的 Android 倒数日应用。
+本地优先的 Android 倒数日应用。
+
+<p align="center">
+  <a href="https://developer.android.com/">
+    <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&amp;logo=android&amp;logoColor=white">
+  </a>
+  <a href="https://kotlinlang.org/">
+    <img alt="Kotlin 2.2.10" src="https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?style=for-the-badge&amp;logo=kotlin&amp;logoColor=white">
+  </a>
+  <a href="https://developer.android.com/compose">
+    <img alt="Jetpack Compose" src="https://img.shields.io/badge/Jetpack_Compose-2026.06.00-4285F4?style=for-the-badge&amp;logo=jetpackcompose&amp;logoColor=white">
+  </a>
+  <a href="https://m3.material.io/">
+    <img alt="Material 3" src="https://img.shields.io/badge/Material_3-UI-6750A4?style=for-the-badge&amp;logo=materialdesign&amp;logoColor=white">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://gradle.org/">
+    <img alt="Gradle 9.1" src="https://img.shields.io/badge/Gradle-9.1-02303A?style=for-the-badge&amp;logo=gradle&amp;logoColor=white">
+  </a>
+  <a href="https://developer.android.com/about/versions/oreo">
+    <img alt="Minimum API 26" src="https://img.shields.io/badge/Min_API-26-34A853?style=for-the-badge&amp;logo=android&amp;logoColor=white">
+  </a>
+  <a href="./LICENSE">
+    <img alt="Apache License 2.0" src="https://img.shields.io/badge/License-Apache_2.0-D22128?style=for-the-badge&amp;logo=apache&amp;logoColor=white">
+  </a>
+</p>
 
 ## 已实现
 
 - 倒数日与正数日：今天、未来、过去日期均可显示。
 - 每年重复：适合生日、纪念日等；2 月 29 日在非闰年按 2 月 28 日处理。
-- 事件管理：标题、日期、可选分类、备注、置顶、提醒。
+- 分类管理与分类封面。
+- 日子背景图片和焦点调整。
+- 草稿保存。
+- 排序、筛选和置顶。
 - 本地提醒：当天、提前 1 / 3 / 7 天；提醒时间在设置中统一调整。
-- 排序与筛选：智能、日期、标题、创建时间；可隐藏过去事件。
-- 原创界面：以“大数字 + 时间轴卡片”为核心，不使用封面图或信息流广告。
-- 主题：暮蓝、朱砂、松烟、古金；支持浅色、深色、跟随系统。
-- 桌面小组件：显示置顶事件或最近事件，日期变化后自动刷新。
-- 隐私：无互联网权限、无账号、无广告、无分析 SDK、无云备份、无默认数据。
+- 十套主题：暮蓝、朱砂、松烟、古金、Catppuccin、Rosé Pine、Nord、Solarized、Gruvbox、Dracula；支持浅色、深色、跟随系统。
+- 可横向、纵向缩放的小组件：显示置顶事件或最近事件，日期变化后自动刷新。
+- 小组件可使用当前事件背景图。
+- 长按应用图标可请求添加小组件。
+- 设置页主动检查 GitHub Release 更新：优先 latest.json，失败后使用 GitHub Releases API。
+- 用户事件、分类、备注和图片不会上传。
 
 ## 明确未实现
 
-日期计算器、里程碑、事件封面、历史上的今天、登录注册、云同步、备份导入导出、广告、默认节日数据、农历。
+日期计算器、里程碑、历史上的今天、登录和云同步、备份导入导出、默认节日、农历、广告。
 
 ## 技术结构
 
@@ -51,6 +82,11 @@
 - 创建非 draft、非 prerelease Release
 - 同时上传 APK 和 latest.json
 
+版本号来源于 `version.properties`。
+正式 APK 由用户在 Android Studio 中手动签名。
+`scripts/release.py` 只负责重命名 APK、计算大小和 SHA-256、生成 latest.json。
+脚本不会构建、签名或上传 APK。
+
 ## 开发环境
 
 - Android Studio（支持 Android Gradle Plugin 9.0.1）
@@ -64,28 +100,12 @@
 
 ```bash
 # Linux / macOS
+./gradlew test
 ./gradlew assembleDebug
 
 # Windows
+gradlew.bat test
 gradlew.bat assembleDebug
-```
-
-## 本地校验
-
-```bash
-python3 tools/verify_project.py
-```
-
-核心日期与排序算法还可脱离 Android SDK 做烟雾测试：
-
-```bash
-kotlinc \
-  app/src/main/java/io/github/thedayapp/data/Models.kt \
-  app/src/main/java/io/github/thedayapp/domain/DayMath.kt \
-  app/src/main/java/io/github/thedayapp/domain/EventOrdering.kt \
-  tools/core-smoke/Main.kt \
-  -include-runtime -d /tmp/the-day-core.jar
-java -jar /tmp/the-day-core.jar
 ```
 
 ## 隐私边界
