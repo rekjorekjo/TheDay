@@ -16,4 +16,26 @@
     <string name="shortcut_add_widget_short">添加小组件</string>
     <string name="shortcut_add_widget_long">添加 The Day 小组件</string>
     <string name="widget_pin_not_supported">当前桌面不支持直接添加小组件</string>
+    <string name="notification_channel_updates_name">应用更新</string>
+    <string name="notification_channel_updates_description">在更新下载完成后发送通知</string>
+    <string name="notification_update_ready_title">更新已下载</string>
+    <string name="notification_update_ready_text">The Day %1$s 已准备好，点按安装</string>
+    <string name="notification_update_failed_title">更新下载失败</string>
+    <string name="notification_update_failed_text">安装包校验失败，请重新检查更新</string>
+    <string name="update_card_title">应用更新</string>
+    <string name="update_current_version">当前版本：%1$s</string>
+    <string name="update_wifi_only_title">仅在 Wi-Fi 下下载</string>
+    <string name="update_wifi_only_description">关闭后可能使用移动数据</string>
+    <string name="update_check_button">检查更新</string>
+    <string name="update_checking">正在检查</string>
+    <string name="update_upto_date">已是最新版本</string>
+    <string name="update_downloading">发现 The Day %1$s，正在下载</string>
+    <string name="update_downloading_progress">正在下载 %1$d%%</string>
+    <string name="update_downloading_without_progress">正在下载</string>
+    <string name="update_waiting_network">等待合适的网络开始下载</string>
+    <string name="update_verifying">正在校验安装包</string>
+    <string name="update_ready">The Day %1$s 已准备好</string>
+    <string name="update_install_button">安装更新</string>
+    <string name="update_failed">检查失败，请稍后重试</string>
+    <string name="update_download_failed">下载失败，请重新检查</string>
 </resources>

@@ -26,6 +26,31 @@
 - `AppWidgetProvider + RemoteViews` 桌面小组件。
 - 最低 Android 8.0（API 26）。
 
+## 发布规则
+
+每个正式 Release 必须包含：
+
+1. 标签：`vX.Y.Z`
+
+2. APK：`TheDay-vX.Y.Z.apk`
+
+3. manifest：`latest.json`
+
+   `latest.json` 中：
+   - `tagName` 与 Release tag 一致
+   - `versionName` 与 APK versionName 一致
+   - `versionCode` 与 APK versionCode 一致
+   - `size` 为 APK 实际字节数
+   - `sha256` 为 APK 实际 SHA-256
+   - APK URL 指向当前 Release
+
+每次发布必须：
+- 增加 versionCode
+- 更新 versionName
+- 使用同一发布密钥
+- 创建非 draft、非 prerelease Release
+- 同时上传 APK 和 latest.json
+
 ## 开发环境
 
 - Android Studio（支持 Android Gradle Plugin 9.0.1）
@@ -35,29 +60,14 @@
 - Kotlin 2.2.10（由 AGP 9 内置 Kotlin 配合 Compose Compiler 插件）
 - Jetpack Compose BOM 2026.06.00
 
-本源码包不附带 Gradle Wrapper JAR（二进制文件）。可采用以下任一方式：
-
-1. 在 Android Studio 中打开根目录，并将 Gradle Distribution 设为本机的 Gradle 9.1.0。
-2. 安装 Gradle 9.1.0 后，在项目根目录运行：
+本项目已包含标准 Gradle Wrapper，可直接使用：
 
 ```bash
 # Linux / macOS
-./tools/setup-wrapper.sh
-
-# Windows PowerShell
-./tools/setup-wrapper.ps1
-```
-
-生成 Wrapper 后构建调试版：
-
-```bash
 ./gradlew assembleDebug
-```
 
-Windows 使用：
-
-```powershell
-.\gradlew.bat assembleDebug
+# Windows
+gradlew.bat assembleDebug
 ```
 
 ## 本地校验

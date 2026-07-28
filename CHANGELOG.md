@@ -9,4 +9,5 @@
 - 支持桌面小组件。
 - 接入 07 | 24 日历应用图标与 Android 主题图标。
 - 新增 Catppuccin、Rosé Pine、Nord、Solarized、Gruvbox 与 Dracula 配色。
-- 纯本地、无广告、无登录、无网络权限、无默认事件。
+- 应用内更新：设置页检查更新，DownloadManager 下载，系统安装器确认。
+- 纯本地、无广告、无登录、无默认事件。

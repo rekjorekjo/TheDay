@@ -1,7 +1,10 @@
 package io.github.thedayapp.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.app.TimePickerDialog
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -30,6 +33,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Sort
+import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -48,10 +52,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -59,11 +68,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.thedayapp.BuildConfig
+import io.github.thedayapp.MainActivity
+import io.github.thedayapp.R
 import io.github.thedayapp.data.PaletteStyle
 import io.github.thedayapp.data.SortDirection
 import io.github.thedayapp.data.SortMode
 import io.github.thedayapp.data.ThemeMode
 import io.github.thedayapp.data.TheDayState
+import io.github.thedayapp.update.AppUpdateManager
+import io.github.thedayapp.update.UpdateCheckResult
+import io.github.thedayapp.update.UpdateDownloadState
+import io.github.thedayapp.update.UpdatePreferences
 import io.github.thedayapp.ui.theme.palettePreviewColor
 import io.github.thedayapp.util.DateFormatting
 
@@ -328,6 +343,8 @@ fun SettingsScreen(
                 )
             }
 
+            UpdateSettingsCard()
+
             SettingsCard(
                 icon = Icons.Rounded.Info,
                 title = "关于",
@@ -497,4 +514,210 @@ private fun SwitchRow(
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
+}
+
+@Composable
+private fun UpdateSettingsCard() {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val updateManager = remember { AppUpdateManager(context) }
+    val preferences = remember { UpdatePreferences(context) }
+
+    var isChecking by remember { mutableStateOf(false) }
+    var checkMessage by remember { mutableStateOf<String?>(null) }
+    var wifiOnly by remember { mutableStateOf(preferences.wifiOnly) }
+    var downloadStatus by remember { mutableStateOf(updateManager.currentStatus()) }
+
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            downloadStatus = updateManager.currentStatus()
+
+            delay(
+                when (downloadStatus.state) {
+                    UpdateDownloadState.WAITING,
+                    UpdateDownloadState.DOWNLOADING,
+                    UpdateDownloadState.VERIFYING -> 1000L
+
+                    else -> 3000L
+                },
+            )
+        }
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Update,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    context.getString(R.string.update_card_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+
+            Text(
+                context.getString(R.string.update_current_version, BuildConfig.VERSION_NAME),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(18.dp))
+
+            SwitchRow(
+                title = context.getString(R.string.update_wifi_only_title),
+                description = context.getString(R.string.update_wifi_only_description),
+                checked = wifiOnly,
+                onCheckedChange = { newValue ->
+                    wifiOnly = newValue
+                    preferences.wifiOnly = newValue
+                },
+            )
+            Spacer(Modifier.height(18.dp))
+
+            val downloadBusy = downloadStatus.state == UpdateDownloadState.WAITING ||
+                downloadStatus.state == UpdateDownloadState.DOWNLOADING ||
+                downloadStatus.state == UpdateDownloadState.VERIFYING
+
+            val buttonEnabled = !isChecking && !downloadBusy
+
+            OutlinedButton(
+                onClick = {
+                    coroutineScope.launch {
+                        isChecking = true
+                        checkMessage = null
+
+                        try {
+                            when (val result = updateManager.checkForUpdate()) {
+                                is UpdateCheckResult.UpdateAvailable -> {
+                                    val started = updateManager.startDownload(result.release)
+                                    if (started) {
+                                        checkMessage = context.getString(
+                                            R.string.update_downloading,
+                                            result.release.versionName,
+                                        )
+                                    } else {
+                                        checkMessage = context.getString(R.string.update_download_failed)
+                                    }
+                                }
+
+                                UpdateCheckResult.UpToDate -> {
+                                    checkMessage = context.getString(R.string.update_upto_date)
+                                }
+
+                                UpdateCheckResult.CheckFailed -> {
+                                    checkMessage = context.getString(R.string.update_failed)
+                                }
+                            }
+
+                            downloadStatus = updateManager.currentStatus()
+                        } finally {
+                            isChecking = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = buttonEnabled,
+            ) {
+                Text(
+                    if (isChecking) {
+                        context.getString(R.string.update_checking)
+                    } else {
+                        context.getString(R.string.update_check_button)
+                    }
+                )
+            }
+
+            checkMessage?.let { message ->
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            when (downloadStatus.state) {
+                UpdateDownloadState.WAITING -> {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        context.getString(R.string.update_waiting_network),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                UpdateDownloadState.DOWNLOADING -> {
+                    Spacer(Modifier.height(12.dp))
+                    val progressPercent = downloadStatus.progressPercent
+                    Text(
+                        if (progressPercent != null) {
+                            context.getString(R.string.update_downloading_progress, progressPercent)
+                        } else {
+                            context.getString(R.string.update_downloading_without_progress)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                UpdateDownloadState.VERIFYING -> {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        context.getString(R.string.update_verifying),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                UpdateDownloadState.READY -> {
+                    val versionName = downloadStatus.versionName
+                    if (versionName != null) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            context.getString(R.string.update_ready, versionName),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            val activity = context.findActivity()
+                            if (activity != null) {
+                                updateManager.requestInstall(activity)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(context.getString(R.string.update_install_button))
+                    }
+                }
+                UpdateDownloadState.FAILED -> {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        context.getString(R.string.update_download_failed),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                else -> {}
+            }
+        }
+    }
+}
+
+private fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
 }

@@ -3,6 +3,7 @@ package io.github.thedayapp
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -14,17 +15,23 @@ import androidx.compose.runtime.setValue
 import io.github.thedayapp.data.TheDayState
 import io.github.thedayapp.ui.TheDayApp
 import io.github.thedayapp.ui.theme.TheDayTheme
+import io.github.thedayapp.update.UpdateActions
+import io.github.thedayapp.update.AppUpdateManager
+import io.github.thedayapp.update.UpdatePreferences
 import io.github.thedayapp.widget.DayWidgetProvider
 
 class MainActivity : ComponentActivity() {
     private lateinit var appState: TheDayState
+    private lateinit var updateManager: AppUpdateManager
     private var openEventId: String? by mutableStateOf(null)
     private var shouldRequestWidgetPin = false
+    private var shouldInstallUpdate = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         appState = TheDayState(applicationContext)
+        updateManager = AppUpdateManager(applicationContext)
         handleLaunchIntent(intent)
 
         setContent {
@@ -55,6 +62,19 @@ class MainActivity : ComponentActivity() {
             shouldRequestWidgetPin = false
             requestWidgetPin()
         }
+
+        if (shouldInstallUpdate) {
+            shouldInstallUpdate = false
+            updateManager.requestInstall(this)
+        }
+
+        val updatePreferences = UpdatePreferences(applicationContext)
+        if (updatePreferences.pendingInstallPermission &&
+            (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls())
+        ) {
+            updatePreferences.pendingInstallPermission = false
+            updateManager.requestInstall(this)
+        }
     }
 
     private fun handleLaunchIntent(intent: Intent) {
@@ -62,6 +82,10 @@ class MainActivity : ComponentActivity() {
 
         if (intent.action == ACTION_PIN_WIDGET) {
             shouldRequestWidgetPin = true
+        }
+
+        if (intent.action == UpdateActions.ACTION_INSTALL_UPDATE) {
+            shouldInstallUpdate = true
         }
     }
 

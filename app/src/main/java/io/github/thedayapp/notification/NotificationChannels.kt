@@ -7,10 +7,12 @@ import io.github.thedayapp.R
 
 object NotificationChannels {
     const val REMINDERS = "event_reminders"
+    const val APP_UPDATES = "app_updates"
 
     fun ensure(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(
+
+        val remindersChannel = NotificationChannel(
             REMINDERS,
             context.getString(R.string.notification_channel_name),
             NotificationManager.IMPORTANCE_DEFAULT,
@@ -19,6 +21,17 @@ object NotificationChannels {
             enableVibration(true)
             setShowBadge(true)
         }
-        manager.createNotificationChannel(channel)
+
+        val updatesChannel = NotificationChannel(
+            APP_UPDATES,
+            context.getString(R.string.notification_channel_updates_name),
+            NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply {
+            description = context.getString(R.string.notification_channel_updates_description)
+            enableVibration(false)
+            setShowBadge(false)
+        }
+
+        manager.createNotificationChannels(listOf(remindersChannel, updatesChannel))
     }
 }
