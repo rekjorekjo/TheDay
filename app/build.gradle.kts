@@ -1,9 +1,46 @@
+import java.util.Properties
+
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val versionProperties =
+    Properties().apply {
+        rootProject
+            .file("version.properties")
+            .inputStream()
+            .use { input ->
+                load(input)
+            }
+    }
+
+val appVersionCode =
+    versionProperties
+        .getProperty("versionCode")
+        ?.toIntOrNull()
+        ?.takeIf { it > 0 }
+        ?: error(
+            "version.properties: " +
+                "versionCode must be a positive integer",
+        )
+
+val appVersionName =
+    versionProperties
+        .getProperty("versionName")
+        ?.takeIf {
+            it.matches(
+                Regex(
+                    "^\\d+\\.\\d+\\.\\d+$",
+                ),
+            )
+        }
+        ?: error(
+            "version.properties: " +
+                "versionName must use X.Y.Z",
+        )
 
 android {
     namespace = "io.github.thedayapp"
@@ -13,8 +50,8 @@ android {
         applicationId = "io.github.thedayapp"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     buildFeatures {
