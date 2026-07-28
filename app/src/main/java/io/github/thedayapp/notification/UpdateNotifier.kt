@@ -68,4 +68,11 @@ object UpdateNotifier {
 
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_UPDATE_FAILED, notification)
     }
+
+    fun cancelUpdateNotifications(context: Context) {
+        NotificationManagerCompat.from(context.applicationContext).apply {
+            cancel(NOTIFICATION_ID_UPDATE_READY)
+            cancel(NOTIFICATION_ID_UPDATE_FAILED)
+        }
+    }
 }

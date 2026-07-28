@@ -9,9 +9,9 @@
         android:shortcutLongLabel="@string/shortcut_add_widget_long">
 
         <intent
-            android:action="io.github.thedayapp.action.PIN_WIDGET"
+            android:action="android.intent.action.VIEW"
             android:targetPackage="io.github.thedayapp"
-            android:targetClass="io.github.thedayapp.MainActivity" />
+            android:targetClass="io.github.thedayapp.WidgetPinActivity" />
 
     </shortcut>
 

@@ -45,10 +45,6 @@
 - 设置页主动检查 GitHub Release 更新：优先 latest.json，失败后使用 GitHub Releases API。
 - 用户事件、分类、备注和图片不会上传。
 
-## 明确未实现
-
-日期计算器、里程碑、历史上的今天、登录和云同步、备份导入导出、默认节日、农历、广告。
-
 ## 技术结构
 
 - Kotlin + Jetpack Compose + Material 3。

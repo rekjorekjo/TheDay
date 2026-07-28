@@ -33,7 +33,6 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Sort
-import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -505,6 +504,7 @@ private fun AboutAndUpdateSettingsCard() {
     var checkMessage by remember { mutableStateOf<String?>(null) }
     var wifiOnly by remember { mutableStateOf(preferences.wifiOnly) }
     var downloadStatus by remember { mutableStateOf(updateManager.currentStatus()) }
+    var isVerifyingLocally by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         while (isActive) {
@@ -522,47 +522,42 @@ private fun AboutAndUpdateSettingsCard() {
         }
     }
 
+    LaunchedEffect(downloadStatus.state) {
+        if (downloadStatus.state == UpdateDownloadState.VERIFYING && !isVerifyingLocally) {
+            isVerifyingLocally = true
+
+            try {
+                updateManager.verifyPendingDownloadIfNeeded()
+            } finally {
+                isVerifyingLocally = false
+                downloadStatus = updateManager.currentStatus()
+            }
+        }
+    }
+
     SettingsCard(
         icon = Icons.Rounded.Info,
         title = "关于",
     ) {
         Text(
-            "The Day ${BuildConfig.VERSION_NAME}",
+            text = "The Day",
             style = MaterialTheme.typography.titleMedium,
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "本地倒数日与纪念日",
+            text = context.getString(R.string.update_current_version, BuildConfig.VERSION_NAME),
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "本地倒数日与纪念日",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Spacer(Modifier.height(18.dp))
         HorizontalDivider()
-        Spacer(Modifier.height(18.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Update,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Text(
-                context.getString(R.string.update_card_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-
-        Text(
-            context.getString(R.string.update_current_version, BuildConfig.VERSION_NAME),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Spacer(Modifier.height(18.dp))
 
         SwitchRow(

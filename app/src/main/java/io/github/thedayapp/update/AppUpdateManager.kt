@@ -11,9 +11,11 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.util.Log
 import io.github.thedayapp.BuildConfig
 import io.github.thedayapp.R
+import io.github.thedayapp.notification.UpdateNotifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,6 +31,51 @@ class AppUpdateManager(context: Context) {
 
     companion object {
         private const val TAG = "TheDayUpdate"
+    }
+
+    init {
+        clearInstalledUpdateIfNeeded()
+    }
+
+    private fun clearInstalledUpdateIfNeeded() {
+        val pendingVersionName = preferences.pendingVersionName ?: return
+
+        val currentVersion = parseSemanticVersion(BuildConfig.VERSION_NAME) ?: return
+        val pendingVersion = parseSemanticVersion(pendingVersionName) ?: return
+
+        if (compareSemanticVersions(currentVersion, pendingVersion) < 0) {
+            return
+        }
+
+        clearObsoleteUpdate()
+    }
+
+    private fun clearObsoleteUpdate() {
+        val downloadId = preferences.pendingDownloadId
+        val assetName = preferences.pendingAssetName
+
+        if (downloadId != null) {
+            runCatching {
+                downloadManager.remove(downloadId)
+            }
+        }
+
+        val downloadDirectory = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+
+        if (downloadDirectory != null && assetName != null) {
+            val apkFile = File(downloadDirectory, assetName)
+
+            if (apkFile.exists() && !apkFile.delete()) {
+                Log.w(TAG, "Failed to delete obsolete update file")
+            }
+        }
+
+        preferences.clearPendingUpdate()
+        preferences.pendingInstallPermission = false
+
+        UpdateNotifier.cancelUpdateNotifications(appContext)
+
+        Log.i(TAG, "Cleared installed or obsolete update")
     }
 
     private fun markDownloadFailed(downloadId: Long?) {
@@ -208,6 +255,8 @@ class AppUpdateManager(context: Context) {
     }
 
     fun currentStatus(): UpdateDownloadStatus {
+        clearInstalledUpdateIfNeeded()
+
         val downloadId = preferences.pendingDownloadId
         val downloadFailed = preferences.downloadFailed
 
@@ -285,6 +334,9 @@ class AppUpdateManager(context: Context) {
     }
 
     suspend fun verifyDownload(downloadId: Long): Boolean = withContext(Dispatchers.IO) {
+        val verificationStartedAt = SystemClock.elapsedRealtime()
+        Log.i(TAG, "APK verification started")
+
         val pendingId = preferences.pendingDownloadId
         if (downloadId != pendingId) {
             Log.w(TAG, "Download ID mismatch")
@@ -361,7 +413,7 @@ class AppUpdateManager(context: Context) {
 
                 preferences.verified = true
                 preferences.downloadFailed = false
-                Log.i(TAG, "Download verified successfully")
+                Log.i(TAG, "APK verification completed in ${SystemClock.elapsedRealtime() - verificationStartedAt} ms")
                 true
             }
         } catch (exception: CancellationException) {
@@ -371,6 +423,22 @@ class AppUpdateManager(context: Context) {
             markDownloadFailed(downloadId)
             false
         }
+    }
+
+    suspend fun verifyPendingDownloadIfNeeded(): Boolean? {
+        val status = currentStatus()
+
+        if (status.state == UpdateDownloadState.READY) {
+            return true
+        }
+
+        if (status.state != UpdateDownloadState.VERIFYING) {
+            return null
+        }
+
+        val downloadId = preferences.pendingDownloadId ?: return false
+
+        return verifyDownload(downloadId)
     }
 
     fun requestInstall(activity: Activity): InstallLaunchResult {

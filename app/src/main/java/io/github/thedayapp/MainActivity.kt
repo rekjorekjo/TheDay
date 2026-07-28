@@ -1,11 +1,8 @@
 package io.github.thedayapp
 
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,17 +15,20 @@ import io.github.thedayapp.ui.theme.TheDayTheme
 import io.github.thedayapp.update.UpdateActions
 import io.github.thedayapp.update.AppUpdateManager
 import io.github.thedayapp.update.UpdatePreferences
-import io.github.thedayapp.widget.DayWidgetProvider
 
 class MainActivity : ComponentActivity() {
     private lateinit var appState: TheDayState
     private lateinit var updateManager: AppUpdateManager
     private var openEventId: String? by mutableStateOf(null)
-    private var shouldRequestWidgetPin = false
     private var shouldInstallUpdate = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (redirectLegacyWidgetShortcut(intent)) {
+            return
+        }
+
         enableEdgeToEdge()
         appState = TheDayState(applicationContext)
         updateManager = AppUpdateManager(applicationContext)
@@ -48,6 +48,11 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+
+        if (redirectLegacyWidgetShortcut(intent)) {
+            return
+        }
+
         handleLaunchIntent(intent)
     }
 
@@ -58,73 +63,61 @@ class MainActivity : ComponentActivity() {
             appState.refreshClock()
         }
 
-        if (shouldRequestWidgetPin) {
-            shouldRequestWidgetPin = false
-            requestWidgetPin()
-        }
+        if (::updateManager.isInitialized) {
+            if (shouldInstallUpdate) {
+                shouldInstallUpdate = false
+                updateManager.requestInstall(this)
+            }
 
-        if (shouldInstallUpdate) {
-            shouldInstallUpdate = false
-            updateManager.requestInstall(this)
-        }
+            val updatePreferences =
+                UpdatePreferences(applicationContext)
 
-        val updatePreferences = UpdatePreferences(applicationContext)
-        if (updatePreferences.pendingInstallPermission &&
-            (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls())
-        ) {
-            updatePreferences.pendingInstallPermission = false
-            updateManager.requestInstall(this)
+            if (
+                updatePreferences
+                    .pendingInstallPermission &&
+                (
+                    Build.VERSION.SDK_INT <
+                        Build.VERSION_CODES.O ||
+                        packageManager
+                            .canRequestPackageInstalls()
+                )
+            ) {
+                updatePreferences
+                    .pendingInstallPermission = false
+                updateManager.requestInstall(this)
+            }
         }
     }
 
     private fun handleLaunchIntent(intent: Intent) {
         openEventId = intent.getStringExtra(EXTRA_OPEN_EVENT_ID)
 
-        if (intent.action == ACTION_PIN_WIDGET) {
-            shouldRequestWidgetPin = true
-        }
-
         if (intent.action == UpdateActions.ACTION_INSTALL_UPDATE) {
             shouldInstallUpdate = true
         }
     }
 
-    private fun requestWidgetPin() {
-        val appWidgetManager = AppWidgetManager.getInstance(this)
-
-        if (!appWidgetManager.isRequestPinAppWidgetSupported()) {
-            Toast.makeText(
-                this,
-                R.string.widget_pin_not_supported,
-                Toast.LENGTH_SHORT,
-            ).show()
-            return
+    private fun redirectLegacyWidgetShortcut(
+        intent: Intent,
+    ): Boolean {
+        if (intent.action != ACTION_PIN_WIDGET) {
+            return false
         }
 
-        val provider = ComponentName(
-            this,
-            DayWidgetProvider::class.java,
+        startActivity(
+            Intent(
+                this,
+                WidgetPinActivity::class.java,
+            ),
         )
 
-        val requestAccepted = try {
-            appWidgetManager.requestPinAppWidget(
-                provider,
-                null,
-                null,
-            )
-        } catch (exception: IllegalStateException) {
-            false
-        } catch (exception: SecurityException) {
-            false
+        if (!isTaskRoot) {
+            finish()
+        } else {
+            finishAndRemoveTask()
         }
 
-        if (!requestAccepted) {
-            Toast.makeText(
-                this,
-                R.string.widget_pin_not_supported,
-                Toast.LENGTH_SHORT,
-            ).show()
-        }
+        return true
     }
 
     companion object {

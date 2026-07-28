@@ -17,6 +17,7 @@ source.zip
 
 # Local bootstrap and downloaded build tools
 tools/
+scripts/
 
 # Build packages
 *.apk
