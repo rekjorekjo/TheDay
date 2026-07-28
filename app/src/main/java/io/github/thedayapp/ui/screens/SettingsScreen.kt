@@ -149,7 +149,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     PaletteStyle.entries.forEach { style ->
                         PaletteOption(
@@ -417,7 +417,7 @@ private fun PaletteOption(
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(44.dp)
                 .then(
                     if (selected) {
                         Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
@@ -425,7 +425,7 @@ private fun PaletteOption(
                         Modifier
                     },
                 )
-                .padding(5.dp)
+                .padding(4.dp)
                 .background(color, CircleShape),
         )
         Spacer(Modifier.height(6.dp))
@@ -435,6 +435,12 @@ private fun PaletteOption(
                 PaletteStyle.CINNABAR -> "朱砂"
                 PaletteStyle.PINE -> "松烟"
                 PaletteStyle.ANTIQUE_GOLD -> "古金"
+                PaletteStyle.CATPPUCCIN -> "猫咖"
+                PaletteStyle.ROSE_PINE -> "蔷薇"
+                PaletteStyle.NORD -> "北境"
+                PaletteStyle.SOLARIZED -> "日光"
+                PaletteStyle.GRUVBOX -> "暖木"
+                PaletteStyle.DRACULA -> "夜紫"
             },
             style = MaterialTheme.typography.labelMedium,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,

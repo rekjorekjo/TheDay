@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#17283D</color>
+    <color name="ic_launcher_background">#173A37</color>
     <color name="ic_launcher_foreground">#F4E7C2</color>
     <color name="notification_accent">#294A72</color>
     <color name="widget_midnight">#17283D</color>
@@ -17,5 +17,17 @@
     <color name="widget_pine_end">#18372F</color>
     <color name="widget_antique_gold_start">#806A2D</color>
     <color name="widget_antique_gold_end">#443616</color>
+    <color name="widget_catppuccin_start">#7451A6</color>
+    <color name="widget_catppuccin_end">#1E1E2E</color>
+    <color name="widget_rose_pine_start">#765F8F</color>
+    <color name="widget_rose_pine_end">#232136</color>
+    <color name="widget_nord_start">#5E81AC</color>
+    <color name="widget_nord_end">#2E3440</color>
+    <color name="widget_solarized_start">#2A8C86</color>
+    <color name="widget_solarized_end">#002B36</color>
+    <color name="widget_gruvbox_start">#B84F0D</color>
+    <color name="widget_gruvbox_end">#282828</color>
+    <color name="widget_dracula_start">#8E6BB8</color>
+    <color name="widget_dracula_end">#282A36</color>
     <color name="widget_border">#35FFF8EA</color>
 </resources>

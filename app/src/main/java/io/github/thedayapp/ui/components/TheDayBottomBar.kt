@@ -1,11 +1,22 @@
 package io.github.thedayapp.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.CalendarMonth
@@ -15,13 +26,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 
 enum class TheDayTab {
@@ -39,14 +52,6 @@ fun TheDayBottomBar(
     onNewClick: () -> Unit,
     onSettingsClick: () -> Unit,
 ) {
-    val itemColors = NavigationBarItemDefaults.colors(
-        selectedIconColor = MaterialTheme.colorScheme.primary,
-        selectedTextColor = MaterialTheme.colorScheme.primary,
-        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
@@ -56,89 +61,138 @@ fun TheDayBottomBar(
         ) {
             HorizontalDivider(
                 thickness = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f),
+                color = MaterialTheme.colorScheme.outline.copy(
+                    alpha = 0.16f,
+                ),
             )
+
             NavigationBar(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp),
+                    .height(64.dp)
+                    .selectableGroup(),
                 containerColor = Color.Transparent,
                 tonalElevation = 0.dp,
-                windowInsets = WindowInsets(0, 0, 0, 0),
+                windowInsets = WindowInsets(
+                    left = 0,
+                    top = 0,
+                    right = 0,
+                    bottom = 0,
+                ),
             ) {
-                NavigationBarItem(
-                    selected = selectedTab == TheDayTab.DAYS,
+                TheDayNavigationItem(
+                    selected =
+                        selectedTab ==
+                            TheDayTab.DAYS,
                     onClick = onDaysClick,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.CalendarMonth,
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "日子",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    },
-                    colors = itemColors,
+                    icon =
+                        Icons.Rounded.CalendarMonth,
+                    label = "日子",
                 )
-                NavigationBarItem(
-                    selected = selectedTab == TheDayTab.CATEGORIES,
+
+                TheDayNavigationItem(
+                    selected =
+                        selectedTab ==
+                            TheDayTab.CATEGORIES,
                     onClick = onCategoriesClick,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.MenuBook,
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "分类",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    },
-                    colors = itemColors,
+                    icon =
+                        Icons.Rounded.MenuBook,
+                    label = "分类",
                 )
-                NavigationBarItem(
-                    selected = selectedTab == TheDayTab.NEW,
+
+                TheDayNavigationItem(
+                    selected =
+                        selectedTab ==
+                            TheDayTab.NEW,
                     onClick = onNewClick,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.AddCircle,
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "新建",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    },
-                    colors = itemColors,
+                    icon =
+                        Icons.Rounded.AddCircle,
+                    label = "新建",
                 )
-                NavigationBarItem(
-                    selected = selectedTab == TheDayTab.SETTINGS,
+
+                TheDayNavigationItem(
+                    selected =
+                        selectedTab ==
+                            TheDayTab.SETTINGS,
                     onClick = onSettingsClick,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Settings,
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "设置",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    },
-                    colors = itemColors,
+                    icon =
+                        Icons.Rounded.Settings,
+                    label = "设置",
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.TheDayNavigationItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: ImageVector,
+    label: String,
+) {
+    val contentColor =
+        if (selected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme
+                .onSurfaceVariant
+        }
+
+    val containerColor =
+        if (selected) {
+            MaterialTheme.colorScheme.primary
+                .copy(alpha = 0.13f)
+        } else {
+            Color.Transparent
+        }
+
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .selectable(
+                selected = selected,
+                onClick = onClick,
+                role = Role.Tab,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(min = 68.dp)
+                .clip(
+                    RoundedCornerShape(18.dp),
+                )
+                .background(containerColor)
+                .padding(
+                    horizontal = 14.dp,
+                    vertical = 5.dp,
+                ),
+            horizontalAlignment =
+                Alignment.CenterHorizontally,
+            verticalArrangement =
+                Arrangement.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = contentColor,
+            )
+
+            Spacer(
+                modifier = Modifier.height(2.dp),
+            )
+
+            Text(
+                text = label,
+                style =
+                    MaterialTheme.typography
+                        .labelSmall,
+                color = contentColor,
+                maxLines = 1,
+            )
         }
     }
 }

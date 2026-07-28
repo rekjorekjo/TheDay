@@ -155,6 +155,12 @@ class DayWidgetProvider : AppWidgetProvider() {
             PaletteStyle.CINNABAR -> R.drawable.widget_bg_cinnabar
             PaletteStyle.PINE -> R.drawable.widget_bg_pine
             PaletteStyle.ANTIQUE_GOLD -> R.drawable.widget_bg_antique_gold
+            PaletteStyle.CATPPUCCIN -> R.drawable.widget_bg_catppuccin
+            PaletteStyle.ROSE_PINE -> R.drawable.widget_bg_rose_pine
+            PaletteStyle.NORD -> R.drawable.widget_bg_nord
+            PaletteStyle.SOLARIZED -> R.drawable.widget_bg_solarized
+            PaletteStyle.GRUVBOX -> R.drawable.widget_bg_gruvbox
+            PaletteStyle.DRACULA -> R.drawable.widget_bg_dracula
         }
 
         private fun scheduleNextMidnight(context: Context) {

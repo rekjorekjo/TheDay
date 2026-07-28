@@ -150,11 +150,233 @@ private val AntiqueGoldDark = darkColorScheme(
     outline = Color(0xFF969080),
 )
 
+private val CatppuccinLight = lightColorScheme(
+    primary = Color(0xFF8839EF),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFE6E9EF),
+    onPrimaryContainer = Color(0xFF4C4F69),
+    secondary = Color(0xFF179299),
+    onSecondary = Color(0xFF11111B),
+    tertiary = Color(0xFFD20F39),
+    onTertiary = Color(0xFFFFFFFF),
+    background = Color(0xFFEFF1F5),
+    onBackground = Color(0xFF4C4F69),
+    surface = Color(0xFFE6E9EF),
+    onSurface = Color(0xFF4C4F69),
+    surfaceVariant = Color(0xFFCCD0DA),
+    onSurfaceVariant = Color(0xFF4C4F69),
+    outline = Color(0xFF8C8FA1),
+)
+
+private val CatppuccinDark = darkColorScheme(
+    primary = Color(0xFFCBA6F7),
+    onPrimary = Color(0xFF1E1E2E),
+    primaryContainer = Color(0xFF45475A),
+    onPrimaryContainer = Color(0xFFF5E0DC),
+    secondary = Color(0xFF94E2D5),
+    onSecondary = Color(0xFF11111B),
+    tertiary = Color(0xFFF38BA8),
+    onTertiary = Color(0xFF1E1E2E),
+    background = Color(0xFF1E1E2E),
+    onBackground = Color(0xFFCDD6F4),
+    surface = Color(0xFF181825),
+    onSurface = Color(0xFFCDD6F4),
+    surfaceVariant = Color(0xFF313244),
+    onSurfaceVariant = Color(0xFFBAC2DE),
+    outline = Color(0xFF7F849C),
+)
+
+private val RosePineLight = lightColorScheme(
+    primary = Color(0xFF765F8F),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFF2E9E1),
+    onPrimaryContainer = Color(0xFF575279),
+    secondary = Color(0xFF974C64),
+    onSecondary = Color(0xFFFFFFFF),
+    tertiary = Color(0xFF286983),
+    onTertiary = Color(0xFFFFFFFF),
+    background = Color(0xFFFAF4ED),
+    onBackground = Color(0xFF575279),
+    surface = Color(0xFFFFFAF3),
+    onSurface = Color(0xFF575279),
+    surfaceVariant = Color(0xFFF2E9E1),
+    onSurfaceVariant = Color(0xFF625D76),
+    outline = Color(0xFF9893A5),
+)
+
+private val RosePineDark = darkColorScheme(
+    primary = Color(0xFFC4A7E7),
+    onPrimary = Color(0xFF232136),
+    primaryContainer = Color(0xFF393552),
+    onPrimaryContainer = Color(0xFFE0DEF4),
+    secondary = Color(0xFFEB6F92),
+    onSecondary = Color(0xFF232136),
+    tertiary = Color(0xFF9CCFD8),
+    onTertiary = Color(0xFF232136),
+    background = Color(0xFF232136),
+    onBackground = Color(0xFFE0DEF4),
+    surface = Color(0xFF2A273F),
+    onSurface = Color(0xFFE0DEF4),
+    surfaceVariant = Color(0xFF393552),
+    onSurfaceVariant = Color(0xFFD7D3E8),
+    outline = Color(0xFF908CAA),
+)
+
+private val NordLight = lightColorScheme(
+    primary = Color(0xFF4C566A),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFD8DEE9),
+    onPrimaryContainer = Color(0xFF2E3440),
+    secondary = Color(0xFF4B6C91),
+    onSecondary = Color(0xFFFFFFFF),
+    tertiary = Color(0xFF9C4E57),
+    onTertiary = Color(0xFFFFFFFF),
+    background = Color(0xFFECEFF4),
+    onBackground = Color(0xFF2E3440),
+    surface = Color(0xFFE5E9F0),
+    onSurface = Color(0xFF2E3440),
+    surfaceVariant = Color(0xFFD8DEE9),
+    onSurfaceVariant = Color(0xFF434C5E),
+    outline = Color(0xFF4C566A),
+)
+
+private val NordDark = darkColorScheme(
+    primary = Color(0xFF88C0D0),
+    onPrimary = Color(0xFF2E3440),
+    primaryContainer = Color(0xFF3B4252),
+    onPrimaryContainer = Color(0xFFECEFF4),
+    secondary = Color(0xFFA3BE8C),
+    onSecondary = Color(0xFF2E3440),
+    tertiary = Color(0xFFB48EAD),
+    onTertiary = Color(0xFF282E39),
+    background = Color(0xFF2E3440),
+    onBackground = Color(0xFFD8DEE9),
+    surface = Color(0xFF3B4252),
+    onSurface = Color(0xFFE5E9F0),
+    surfaceVariant = Color(0xFF434C5E),
+    onSurfaceVariant = Color(0xFFD8DEE9),
+    outline = Color(0xFF81A1C1),
+)
+
+private val SolarizedLight = lightColorScheme(
+    primary = Color(0xFF526970),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFEEE8D5),
+    onPrimaryContainer = Color(0xFF002B36),
+    secondary = Color(0xFF2AA198),
+    onSecondary = Color(0xFF002B36),
+    tertiary = Color(0xFFB58900),
+    onTertiary = Color(0xFF002B36),
+    background = Color(0xFFFDF6E3),
+    onBackground = Color(0xFF586E75),
+    surface = Color(0xFFEEE8D5),
+    onSurface = Color(0xFF526970),
+    surfaceVariant = Color(0xFFE3DDC8),
+    onSurfaceVariant = Color(0xFF4B6067),
+    outline = Color(0xFF839496),
+)
+
+private val SolarizedDark = darkColorScheme(
+    primary = Color(0xFF93A1A1),
+    onPrimary = Color(0xFF002B36),
+    primaryContainer = Color(0xFF073642),
+    onPrimaryContainer = Color(0xFFEEE8D5),
+    secondary = Color(0xFF2AA198),
+    onSecondary = Color(0xFF002B36),
+    tertiary = Color(0xFFB58900),
+    onTertiary = Color(0xFF002B36),
+    background = Color(0xFF002B36),
+    onBackground = Color(0xFF93A1A1),
+    surface = Color(0xFF073642),
+    onSurface = Color(0xFF93A1A1),
+    surfaceVariant = Color(0xFF314B52),
+    onSurfaceVariant = Color(0xFFEEE8D5),
+    outline = Color(0xFF657B83),
+)
+
+private val GruvboxLight = lightColorScheme(
+    primary = Color(0xFFAF3A03),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFEBDBB2),
+    onPrimaryContainer = Color(0xFF3C3836),
+    secondary = Color(0xFF79740E),
+    onSecondary = Color(0xFFFFFFFF),
+    tertiary = Color(0xFF076678),
+    onTertiary = Color(0xFFFFFFFF),
+    background = Color(0xFFFBF1C7),
+    onBackground = Color(0xFF3C3836),
+    surface = Color(0xFFF2E5BC),
+    onSurface = Color(0xFF3C3836),
+    surfaceVariant = Color(0xFFEBDBB2),
+    onSurfaceVariant = Color(0xFF504945),
+    outline = Color(0xFF7C6F64),
+)
+
+private val GruvboxDark = darkColorScheme(
+    primary = Color(0xFFFE8019),
+    onPrimary = Color(0xFF282828),
+    primaryContainer = Color(0xFF504945),
+    onPrimaryContainer = Color(0xFFFBF1C7),
+    secondary = Color(0xFFB8BB26),
+    onSecondary = Color(0xFF282828),
+    tertiary = Color(0xFF8EC07C),
+    onTertiary = Color(0xFF282828),
+    background = Color(0xFF282828),
+    onBackground = Color(0xFFEBDBB2),
+    surface = Color(0xFF3C3836),
+    onSurface = Color(0xFFEBDBB2),
+    surfaceVariant = Color(0xFF504945),
+    onSurfaceVariant = Color(0xFFD5C4A1),
+    outline = Color(0xFF928374),
+)
+
+private val DraculaLight = lightColorScheme(
+    primary = Color(0xFF644AC9),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFCFCFDE),
+    onPrimaryContainer = Color(0xFF1F1F1F),
+    secondary = Color(0xFFA3144D),
+    onSecondary = Color(0xFFFFFFFF),
+    tertiary = Color(0xFF036A96),
+    onTertiary = Color(0xFFFFFFFF),
+    background = Color(0xFFFFFBEB),
+    onBackground = Color(0xFF1F1F1F),
+    surface = Color(0xFFFFF8E4),
+    onSurface = Color(0xFF1F1F1F),
+    surfaceVariant = Color(0xFFCFCFDE),
+    onSurfaceVariant = Color(0xFF45414E),
+    outline = Color(0xFF6C664B),
+)
+
+private val DraculaDark = darkColorScheme(
+    primary = Color(0xFFBD93F9),
+    onPrimary = Color(0xFF282A36),
+    primaryContainer = Color(0xFF44475A),
+    onPrimaryContainer = Color(0xFFF8F8F2),
+    secondary = Color(0xFFFF79C6),
+    onSecondary = Color(0xFF282A36),
+    tertiary = Color(0xFF8BE9FD),
+    onTertiary = Color(0xFF282A36),
+    background = Color(0xFF282A36),
+    onBackground = Color(0xFFF8F8F2),
+    surface = Color(0xFF30323F),
+    onSurface = Color(0xFFF8F8F2),
+    surfaceVariant = Color(0xFF44475A),
+    onSurfaceVariant = Color(0xFFE4E4DE),
+    outline = Color(0xFF6272A4),
+)
+
 fun colorSchemeFor(style: PaletteStyle, dark: Boolean): ColorScheme = when (style) {
     PaletteStyle.MIDNIGHT -> if (dark) MidnightDark else MidnightLight
     PaletteStyle.CINNABAR -> if (dark) CinnabarDark else CinnabarLight
     PaletteStyle.PINE -> if (dark) PineDark else PineLight
     PaletteStyle.ANTIQUE_GOLD -> if (dark) AntiqueGoldDark else AntiqueGoldLight
+    PaletteStyle.CATPPUCCIN -> if (dark) CatppuccinDark else CatppuccinLight
+    PaletteStyle.ROSE_PINE -> if (dark) RosePineDark else RosePineLight
+    PaletteStyle.NORD -> if (dark) NordDark else NordLight
+    PaletteStyle.SOLARIZED -> if (dark) SolarizedDark else SolarizedLight
+    PaletteStyle.GRUVBOX -> if (dark) GruvboxDark else GruvboxLight
+    PaletteStyle.DRACULA -> if (dark) DraculaDark else DraculaLight
 }
 
 fun palettePreviewColor(style: PaletteStyle): Color = when (style) {
@@ -162,4 +384,10 @@ fun palettePreviewColor(style: PaletteStyle): Color = when (style) {
     PaletteStyle.CINNABAR -> Color(0xFF8D2F2B)
     PaletteStyle.PINE -> Color(0xFF365E52)
     PaletteStyle.ANTIQUE_GOLD -> Color(0xFF8A7130)
+    PaletteStyle.CATPPUCCIN -> Color(0xFF8839EF)
+    PaletteStyle.ROSE_PINE -> Color(0xFF907AA9)
+    PaletteStyle.NORD -> Color(0xFF5E81AC)
+    PaletteStyle.SOLARIZED -> Color(0xFF2AA198)
+    PaletteStyle.GRUVBOX -> Color(0xFFD65D0E)
+    PaletteStyle.DRACULA -> Color(0xFFBD93F9)
 }

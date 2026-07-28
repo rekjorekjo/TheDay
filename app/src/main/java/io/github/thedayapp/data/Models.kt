@@ -19,6 +19,12 @@ enum class PaletteStyle {
     CINNABAR,
     PINE,
     ANTIQUE_GOLD,
+    CATPPUCCIN,
+    ROSE_PINE,
+    NORD,
+    SOLARIZED,
+    GRUVBOX,
+    DRACULA,
 }
 
 enum class SortMode {
