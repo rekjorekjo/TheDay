@@ -7,6 +7,8 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import io.github.thedayapp.MainActivity
@@ -59,10 +61,60 @@ class DayWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle,
+    ) {
+        super.onAppWidgetOptionsChanged(
+            context,
+            appWidgetManager,
+            appWidgetId,
+            newOptions,
+        )
+
+        updateWidget(
+            context,
+            appWidgetManager,
+            appWidgetId,
+        )
+    }
+
     companion object {
         private const val ACTION_REFRESH = "io.github.thedayapp.action.REFRESH_WIDGET"
         private const val ACTION_MIDNIGHT = "io.github.thedayapp.action.WIDGET_MIDNIGHT"
         private val widgetDateFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")
+
+        private data class WidgetSize(
+            val widthDp: Int,
+            val heightDp: Int,
+        )
+
+        private fun widgetSize(
+            manager: AppWidgetManager,
+            appWidgetId: Int,
+        ): WidgetSize {
+            val options =
+                manager.getAppWidgetOptions(
+                    appWidgetId,
+                )
+
+            return WidgetSize(
+                widthDp =
+                    options.getInt(
+                        AppWidgetManager
+                            .OPTION_APPWIDGET_MIN_WIDTH,
+                        180,
+                    ).coerceAtLeast(1),
+                heightDp =
+                    options.getInt(
+                        AppWidgetManager
+                            .OPTION_APPWIDGET_MIN_HEIGHT,
+                        90,
+                    ).coerceAtLeast(1),
+            )
+        }
 
         fun requestUpdate(context: Context) {
             context.sendBroadcast(
@@ -85,6 +137,10 @@ class DayWidgetProvider : AppWidgetProvider() {
             manager: AppWidgetManager,
             appWidgetId: Int,
         ) {
+            val size = widgetSize(manager, appWidgetId)
+            val compact = size.widthDp < 170 || size.heightDp < 88
+            val large = size.widthDp >= 300 && size.heightDp >= 150
+
             val repository = DayRepository(context)
             val settings = repository.loadSettings()
             val today = LocalDate.now()
@@ -103,11 +159,19 @@ class DayWidgetProvider : AppWidgetProvider() {
             if (event == null) {
                 views.setTextViewText(R.id.widget_title, context.getString(R.string.app_name))
                 views.setViewVisibility(R.id.widget_relation, View.GONE)
-                views.setTextViewText(R.id.widget_count, "—")
-                views.setViewVisibility(R.id.widget_count, View.VISIBLE)
-                views.setTextViewText(R.id.widget_unit, context.getString(R.string.widget_empty))
-                views.setViewVisibility(R.id.widget_unit, View.VISIBLE)
-                views.setTextViewText(R.id.widget_date, context.getString(R.string.widget_tap_to_add))
+                if (compact) {
+                    views.setTextViewText(R.id.widget_count, context.getString(R.string.widget_empty))
+                    views.setViewVisibility(R.id.widget_count, View.VISIBLE)
+                    views.setViewVisibility(R.id.widget_unit, View.GONE)
+                    views.setViewVisibility(R.id.widget_date, View.GONE)
+                } else {
+                    views.setTextViewText(R.id.widget_count, "—")
+                    views.setViewVisibility(R.id.widget_count, View.VISIBLE)
+                    views.setTextViewText(R.id.widget_unit, context.getString(R.string.widget_empty))
+                    views.setViewVisibility(R.id.widget_unit, View.VISIBLE)
+                    views.setTextViewText(R.id.widget_date, context.getString(R.string.widget_tap_to_add))
+                    views.setViewVisibility(R.id.widget_date, View.VISIBLE)
+                }
             } else {
                 val delta = DayMath.signedDays(event, today)
                 views.setTextViewText(R.id.widget_title, event.title)
@@ -117,25 +181,53 @@ class DayWidgetProvider : AppWidgetProvider() {
                     views.setViewVisibility(R.id.widget_count, View.VISIBLE)
                     views.setViewVisibility(R.id.widget_unit, View.GONE)
                 } else {
-                    views.setTextViewText(
-                        R.id.widget_relation,
-                        if (delta > 0) {
+                    if (compact) {
+                        val relationText = if (delta > 0) {
                             context.getString(R.string.widget_relation_countdown)
                         } else {
                             context.getString(R.string.widget_relation_countup)
-                        },
-                    )
-                    views.setViewVisibility(R.id.widget_relation, View.VISIBLE)
-                    views.setTextViewText(R.id.widget_count, abs(delta).toString())
-                    views.setViewVisibility(R.id.widget_count, View.VISIBLE)
-                    views.setTextViewText(R.id.widget_unit, context.getString(R.string.widget_unit_days))
-                    views.setViewVisibility(R.id.widget_unit, View.VISIBLE)
+                        }
+                        views.setTextViewText(
+                            R.id.widget_count,
+                            "$relationText ${abs(delta)} ${context.getString(R.string.widget_unit_days)}",
+                        )
+                        views.setViewVisibility(R.id.widget_relation, View.GONE)
+                        views.setViewVisibility(R.id.widget_count, View.VISIBLE)
+                        views.setViewVisibility(R.id.widget_unit, View.GONE)
+                    } else {
+                        views.setTextViewText(
+                            R.id.widget_relation,
+                            if (delta > 0) {
+                                context.getString(R.string.widget_relation_countdown)
+                            } else {
+                                context.getString(R.string.widget_relation_countup)
+                            },
+                        )
+                        views.setViewVisibility(R.id.widget_relation, View.VISIBLE)
+                        views.setTextViewText(R.id.widget_count, abs(delta).toString())
+                        views.setViewVisibility(R.id.widget_count, View.VISIBLE)
+                        views.setTextViewText(R.id.widget_unit, context.getString(R.string.widget_unit_days))
+                        views.setViewVisibility(R.id.widget_unit, View.VISIBLE)
+                    }
                 }
-                views.setTextViewText(
-                    R.id.widget_date,
-                    DayMath.effectiveDate(event, today).format(widgetDateFormatter),
-                )
+                if (compact) {
+                    views.setViewVisibility(R.id.widget_date, View.GONE)
+                } else {
+                    views.setTextViewText(
+                        R.id.widget_date,
+                        DayMath.effectiveDate(event, today).format(widgetDateFormatter),
+                    )
+                    views.setViewVisibility(R.id.widget_date, View.VISIBLE)
+                }
             }
+
+            applyResponsiveLayout(
+                context = context,
+                views = views,
+                size = size,
+                compact = compact,
+                large = large,
+            )
 
             val openIntent = Intent(context, MainActivity::class.java).apply {
                 event?.let { putExtra(MainActivity.EXTRA_OPEN_EVENT_ID, it.id) }
@@ -149,6 +241,51 @@ class DayWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
             manager.updateAppWidget(appWidgetId, views)
         }
+
+        private fun applyResponsiveLayout(
+            context: Context,
+            views: RemoteViews,
+            size: WidgetSize,
+            compact: Boolean,
+            large: Boolean,
+        ) {
+            val density = context.resources.displayMetrics.density
+
+            if (compact) {
+                views.setViewPadding(R.id.widget_content, dpToPx(12, density), dpToPx(9, density), dpToPx(12, density), dpToPx(9, density))
+                views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_SP, 14f)
+                views.setTextViewTextSize(R.id.widget_count, TypedValue.COMPLEX_UNIT_SP, 28f)
+                views.setViewVisibility(R.id.widget_date, View.GONE)
+                views.setInt(R.id.widget_title, "setMaxLines", 1)
+                if (size.widthDp < 145) {
+                    views.setViewVisibility(R.id.widget_accent, View.GONE)
+                } else {
+                    views.setViewVisibility(R.id.widget_accent, View.VISIBLE)
+                }
+            } else if (large) {
+                views.setViewPadding(R.id.widget_content, dpToPx(24, density), dpToPx(20, density), dpToPx(24, density), dpToPx(20, density))
+                views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_SP, 19f)
+                views.setTextViewTextSize(R.id.widget_count, TypedValue.COMPLEX_UNIT_SP, 56f)
+                views.setTextViewTextSize(R.id.widget_relation, TypedValue.COMPLEX_UNIT_SP, 14f)
+                views.setTextViewTextSize(R.id.widget_unit, TypedValue.COMPLEX_UNIT_SP, 15f)
+                views.setTextViewTextSize(R.id.widget_date, TypedValue.COMPLEX_UNIT_SP, 14f)
+                views.setViewVisibility(R.id.widget_date, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_accent, View.VISIBLE)
+                views.setInt(R.id.widget_title, "setMaxLines", 2)
+            } else {
+                views.setViewPadding(R.id.widget_content, dpToPx(20, density), dpToPx(17, density), dpToPx(20, density), dpToPx(17, density))
+                views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_SP, 17f)
+                views.setTextViewTextSize(R.id.widget_count, TypedValue.COMPLEX_UNIT_SP, 46f)
+                views.setTextViewTextSize(R.id.widget_relation, TypedValue.COMPLEX_UNIT_SP, 13f)
+                views.setTextViewTextSize(R.id.widget_unit, TypedValue.COMPLEX_UNIT_SP, 14f)
+                views.setTextViewTextSize(R.id.widget_date, TypedValue.COMPLEX_UNIT_SP, 13f)
+                views.setViewVisibility(R.id.widget_date, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_accent, View.VISIBLE)
+                views.setInt(R.id.widget_title, "setMaxLines", 1)
+            }
+        }
+
+        private fun dpToPx(dp: Int, density: Float): Int = (dp * density).toInt()
 
         private fun backgroundFor(palette: PaletteStyle): Int = when (palette) {
             PaletteStyle.MIDNIGHT -> R.drawable.widget_bg_midnight
