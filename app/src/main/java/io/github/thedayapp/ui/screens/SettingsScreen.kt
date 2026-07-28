@@ -34,7 +34,6 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Update
-import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -332,28 +331,7 @@ fun SettingsScreen(
                 }
             }
 
-            SettingsCard(
-                icon = Icons.Rounded.Widgets,
-                title = "桌面小组件",
-            ) {
-                Text(
-                    "显示置顶事件；没有置顶事件时显示最近事件。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            UpdateSettingsCard()
-
-            SettingsCard(
-                icon = Icons.Rounded.Info,
-                title = "关于",
-            ) {
-                Text(
-                    "The Day ${BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
+            AboutAndUpdateSettingsCard()
 
             OutlinedButton(
                 onClick = { confirmClear = true },
@@ -517,7 +495,7 @@ private fun SwitchRow(
 }
 
 @Composable
-private fun UpdateSettingsCard() {
+private fun AboutAndUpdateSettingsCard() {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val updateManager = remember { AppUpdateManager(context) }
@@ -544,171 +522,184 @@ private fun UpdateSettingsCard() {
         }
     }
 
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
+    SettingsCard(
+        icon = Icons.Rounded.Info,
+        title = "关于",
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Update,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    context.getString(R.string.update_card_title),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-            }
-            Spacer(Modifier.height(16.dp))
+        Text(
+            "The Day ${BuildConfig.VERSION_NAME}",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "本地倒数日与纪念日",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
+        Spacer(Modifier.height(18.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(18.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Update,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
             Text(
-                context.getString(R.string.update_current_version, BuildConfig.VERSION_NAME),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                context.getString(R.string.update_card_title),
+                style = MaterialTheme.typography.titleMedium,
             )
-            Spacer(Modifier.height(18.dp))
+        }
+        Spacer(Modifier.height(16.dp))
 
-            SwitchRow(
-                title = context.getString(R.string.update_wifi_only_title),
-                description = context.getString(R.string.update_wifi_only_description),
-                checked = wifiOnly,
-                onCheckedChange = { newValue ->
-                    wifiOnly = newValue
-                    preferences.wifiOnly = newValue
-                },
-            )
-            Spacer(Modifier.height(18.dp))
+        Text(
+            context.getString(R.string.update_current_version, BuildConfig.VERSION_NAME),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(18.dp))
 
-            val downloadBusy = downloadStatus.state == UpdateDownloadState.WAITING ||
-                downloadStatus.state == UpdateDownloadState.DOWNLOADING ||
-                downloadStatus.state == UpdateDownloadState.VERIFYING
+        SwitchRow(
+            title = context.getString(R.string.update_wifi_only_title),
+            description = context.getString(R.string.update_wifi_only_description),
+            checked = wifiOnly,
+            onCheckedChange = { newValue ->
+                wifiOnly = newValue
+                preferences.wifiOnly = newValue
+            },
+        )
+        Spacer(Modifier.height(18.dp))
 
-            val buttonEnabled = !isChecking && !downloadBusy
+        val downloadBusy = downloadStatus.state == UpdateDownloadState.WAITING ||
+            downloadStatus.state == UpdateDownloadState.DOWNLOADING ||
+            downloadStatus.state == UpdateDownloadState.VERIFYING
 
-            OutlinedButton(
-                onClick = {
-                    coroutineScope.launch {
-                        isChecking = true
-                        checkMessage = null
+        val buttonEnabled = !isChecking && !downloadBusy
 
-                        try {
-                            when (val result = updateManager.checkForUpdate()) {
-                                is UpdateCheckResult.UpdateAvailable -> {
-                                    val started = updateManager.startDownload(result.release)
-                                    if (started) {
-                                        checkMessage = context.getString(
-                                            R.string.update_downloading,
-                                            result.release.versionName,
-                                        )
-                                    } else {
-                                        checkMessage = context.getString(R.string.update_download_failed)
-                                    }
-                                }
+        OutlinedButton(
+            onClick = {
+                coroutineScope.launch {
+                    isChecking = true
+                    checkMessage = null
 
-                                UpdateCheckResult.UpToDate -> {
-                                    checkMessage = context.getString(R.string.update_upto_date)
-                                }
-
-                                UpdateCheckResult.CheckFailed -> {
-                                    checkMessage = context.getString(R.string.update_failed)
+                    try {
+                        when (val result = updateManager.checkForUpdate()) {
+                            is UpdateCheckResult.UpdateAvailable -> {
+                                val started = updateManager.startDownload(result.release)
+                                if (started) {
+                                    checkMessage = context.getString(
+                                        R.string.update_downloading,
+                                        result.release.versionName,
+                                    )
+                                } else {
+                                    checkMessage = context.getString(R.string.update_download_failed)
                                 }
                             }
 
-                            downloadStatus = updateManager.currentStatus()
-                        } finally {
-                            isChecking = false
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = buttonEnabled,
-            ) {
-                Text(
-                    if (isChecking) {
-                        context.getString(R.string.update_checking)
-                    } else {
-                        context.getString(R.string.update_check_button)
-                    }
-                )
-            }
+                            UpdateCheckResult.UpToDate -> {
+                                checkMessage = context.getString(R.string.update_upto_date)
+                            }
 
-            checkMessage?.let { message ->
+                            UpdateCheckResult.CheckFailed -> {
+                                checkMessage = context.getString(R.string.update_failed)
+                            }
+                        }
+
+                        downloadStatus = updateManager.currentStatus()
+                    } finally {
+                        isChecking = false
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = buttonEnabled,
+        ) {
+            Text(
+                if (isChecking) {
+                    context.getString(R.string.update_checking)
+                } else {
+                    context.getString(R.string.update_check_button)
+                },
+            )
+        }
+
+        checkMessage?.let { message ->
+            Spacer(Modifier.height(12.dp))
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        when (downloadStatus.state) {
+            UpdateDownloadState.WAITING -> {
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    message,
+                    context.getString(R.string.update_waiting_network),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-
-            when (downloadStatus.state) {
-                UpdateDownloadState.WAITING -> {
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        context.getString(R.string.update_waiting_network),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                UpdateDownloadState.DOWNLOADING -> {
-                    Spacer(Modifier.height(12.dp))
-                    val progressPercent = downloadStatus.progressPercent
-                    Text(
-                        if (progressPercent != null) {
-                            context.getString(R.string.update_downloading_progress, progressPercent)
-                        } else {
-                            context.getString(R.string.update_downloading_without_progress)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                UpdateDownloadState.VERIFYING -> {
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        context.getString(R.string.update_verifying),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                UpdateDownloadState.READY -> {
-                    val versionName = downloadStatus.versionName
-                    if (versionName != null) {
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            context.getString(R.string.update_ready, versionName),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedButton(
-                        onClick = {
-                            val activity = context.findActivity()
-                            if (activity != null) {
-                                updateManager.requestInstall(activity)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(context.getString(R.string.update_install_button))
-                    }
-                }
-                UpdateDownloadState.FAILED -> {
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        context.getString(R.string.update_download_failed),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-                else -> {}
+            UpdateDownloadState.DOWNLOADING -> {
+                Spacer(Modifier.height(12.dp))
+                val progressPercent = downloadStatus.progressPercent
+                Text(
+                    if (progressPercent != null) {
+                        context.getString(R.string.update_downloading_progress, progressPercent)
+                    } else {
+                        context.getString(R.string.update_downloading_without_progress)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+            UpdateDownloadState.VERIFYING -> {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    context.getString(R.string.update_verifying),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            UpdateDownloadState.READY -> {
+                val versionName = downloadStatus.versionName
+                if (versionName != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        context.getString(R.string.update_ready, versionName),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        val activity = context.findActivity()
+                        if (activity != null) {
+                            updateManager.requestInstall(activity)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(context.getString(R.string.update_install_button))
+                }
+            }
+            UpdateDownloadState.FAILED -> {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    context.getString(R.string.update_download_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            else -> {}
         }
     }
 }
