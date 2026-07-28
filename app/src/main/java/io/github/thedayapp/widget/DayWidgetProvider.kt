@@ -308,12 +308,18 @@ class DayWidgetProvider : AppWidgetProvider() {
             PaletteStyle.CINNABAR -> R.drawable.widget_bg_cinnabar
             PaletteStyle.PINE -> R.drawable.widget_bg_pine
             PaletteStyle.ANTIQUE_GOLD -> R.drawable.widget_bg_antique_gold
-            PaletteStyle.CATPPUCCIN -> R.drawable.widget_bg_catppuccin
-            PaletteStyle.ROSE_PINE -> R.drawable.widget_bg_rose_pine
-            PaletteStyle.NORD -> R.drawable.widget_bg_nord
-            PaletteStyle.SOLARIZED -> R.drawable.widget_bg_solarized
-            PaletteStyle.GRUVBOX -> R.drawable.widget_bg_gruvbox
-            PaletteStyle.DRACULA -> R.drawable.widget_bg_dracula
+            PaletteStyle.BLOOM_PETAL -> R.drawable.widget_bg_bloom_petal
+            PaletteStyle.BLOOM_MIST -> R.drawable.widget_bg_bloom_mist
+            PaletteStyle.BLOOM_VERDANT -> R.drawable.widget_bg_bloom_verdant
+            PaletteStyle.BLOOM_STONE -> R.drawable.widget_bg_bloom_stone
+            PaletteStyle.BLOOM_WHEAT -> R.drawable.widget_bg_bloom_wheat
+            PaletteStyle.BLOOM_INK -> R.drawable.widget_bg_bloom_ink
+            PaletteStyle.BLOOM_AMBER -> R.drawable.widget_bg_bloom_amber
+            PaletteStyle.BLOOM_LAPIS -> R.drawable.widget_bg_bloom_lapis
+            PaletteStyle.BLOOM_RIPPLE -> R.drawable.widget_bg_bloom_ripple
+            PaletteStyle.BLOOM_CINNABAR -> R.drawable.widget_bg_bloom_cinnabar
+            PaletteStyle.BLOOM_SAGE -> R.drawable.widget_bg_bloom_sage
+            PaletteStyle.BLOOM_SPRING -> R.drawable.widget_bg_bloom_spring
         }
 
         private fun scheduleNextMidnight(context: Context) {

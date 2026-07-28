@@ -4,8 +4,8 @@
 
     <gradient
         android:angle="315"
-        android:startColor="@color/widget_rose_pine_start"
-        android:endColor="@color/widget_rose_pine_end" />
+        android:startColor="@color/widget_bloom_ink_start"
+        android:endColor="@color/widget_bloom_ink_end" />
 
     <corners android:radius="24dp" />
 

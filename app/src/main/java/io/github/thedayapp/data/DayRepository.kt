@@ -100,9 +100,8 @@ class DayRepository(context: Context) {
                     json.optString("themeMode"),
                     ThemeMode.SYSTEM,
                 ),
-                paletteStyle = enumValueOrDefault(
+                paletteStyle = paletteStyleFromRaw(
                     json.optString("paletteStyle"),
-                    PaletteStyle.MIDNIGHT,
                 ),
                 sortMode = sortMode,
                 sortDirection = sortDirection,
@@ -269,6 +268,20 @@ class DayRepository(context: Context) {
             .putString(KEY_CATEGORY_COVERS, array.toString())
             .apply()
     }
+
+    private fun paletteStyleFromRaw(raw: String): PaletteStyle =
+        when (raw) {
+            "CATPPUCCIN" -> PaletteStyle.BLOOM_SPRING
+            "ROSE_PINE" -> PaletteStyle.BLOOM_PETAL
+            "NORD" -> PaletteStyle.BLOOM_MIST
+            "SOLARIZED" -> PaletteStyle.BLOOM_RIPPLE
+            "GRUVBOX" -> PaletteStyle.BLOOM_STONE
+            "DRACULA" -> PaletteStyle.BLOOM_LAPIS
+            else -> enumValueOrDefault(
+                raw,
+                PaletteStyle.MIDNIGHT,
+            )
+        }
 
     private inline fun <reified T : Enum<T>> enumValueOrDefault(raw: String, default: T): T =
         enumValues<T>().firstOrNull { it.name == raw } ?: default

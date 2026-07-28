@@ -4,8 +4,8 @@
 
     <gradient
         android:angle="315"
-        android:startColor="@color/widget_gruvbox_start"
-        android:endColor="@color/widget_gruvbox_end" />
+        android:startColor="@color/widget_bloom_sage_start"
+        android:endColor="@color/widget_bloom_sage_end" />
 
     <corners android:radius="24dp" />
 

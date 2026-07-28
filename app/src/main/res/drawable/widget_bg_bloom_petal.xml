@@ -4,8 +4,8 @@
 
     <gradient
         android:angle="315"
-        android:startColor="@color/widget_solarized_start"
-        android:endColor="@color/widget_solarized_end" />
+        android:startColor="@color/widget_bloom_petal_start"
+        android:endColor="@color/widget_bloom_petal_end" />
 
     <corners android:radius="24dp" />
 

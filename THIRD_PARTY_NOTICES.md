@@ -1,30 +1,14 @@
 # Third Party Notices
 
-The Day 的部分主题配色参考并重新映射自以下开源色板：
+The Day 的 Bloom 系列主题配色参考并重新映射自 **Bloom for Typora**。
 
-## 1. Catppuccin
-Copyright (c) 2021 Catppuccin
-MIT License
+## Bloom for Typora
 
-## 2. Rosé Pine
-Copyright (c) 2023 Rosé Pine
-MIT License
+- Author: webkubor
+- License: MIT License
+- Repository: webkubor/typora-Bloom-theme
 
-## 3. Nord
-Copyright (c) 2016-present Sven Greb <development@svengreb.de>
-MIT License
-
-## 4. Solarized
-Copyright (c) 2011 Ethan Schoonover
-MIT License
-
-## 5. Gruvbox
-Copyright (c) 2017 Pavel Pertsev
-MIT/X11 License
-
-## 6. Dracula
-Copyright (c) 2023 Dracula Theme
-MIT License
+The Day 使用 Bloom 的色彩家族作为设计参考，并将其重新映射为 Android Material 3 的颜色角色；并未复制 Typora 的排版、字体或界面代码。
 
 ---
 
@@ -52,6 +36,5 @@ SOFTWARE.
 
 ## 说明
 
-- The Day 对这些色板进行了 Material 3 角色映射和可访问性调整。
-- 第三方色板不代表其作者对 The Day 的认可或背书。
+- Bloom 系列不代表原作者对 The Day 的认可或背书。
 - The Day 项目自身继续使用 Apache License 2.0。
