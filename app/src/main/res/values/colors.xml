@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#17283D</color>
+    <color name="ic_launcher_foreground">#F4E7C2</color>
+    <color name="notification_accent">#294A72</color>
+    <color name="widget_midnight">#17283D</color>
+    <color name="widget_cinnabar">#6F2623</color>
+    <color name="widget_pine">#23483E</color>
+    <color name="widget_antique_gold">#5C4A1D</color>
+    <color name="widget_text_primary">#FFF8EA</color>
+    <color name="widget_text_secondary">#D9D4C8</color>
+    <color name="widget_midnight_start">#294A72</color>
+    <color name="widget_midnight_end">#122235</color>
+    <color name="widget_cinnabar_start">#93443C</color>
+    <color name="widget_cinnabar_end">#4E1D20</color>
+    <color name="widget_pine_start">#3C7062</color>
+    <color name="widget_pine_end">#18372F</color>
+    <color name="widget_antique_gold_start">#806A2D</color>
+    <color name="widget_antique_gold_end">#443616</color>
+    <color name="widget_border">#35FFF8EA</color>
+</resources>

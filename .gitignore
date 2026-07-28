@@ -1,0 +1,28 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+app/build/
+
+# Kotlin generated files
+.kotlin/
+
+# Local archives
+source.zip
+
+# Local bootstrap and downloaded build tools
+tools/
+
+# Build packages
+*.apk
+*.aab
+
+# Signing secrets
+*.jks
+*.keystore
+keystore.properties

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">The Day</string>
+    <string name="notification_channel_name">提醒</string>
+    <string name="notification_channel_description">在设定日期到来前发送提醒</string>
+    <string name="notification_days_left">倒数 %1$d 天</string>
+    <string name="notification_days_passed">正数 %1$d 天</string>
+    <string name="notification_today">今天</string>
+    <string name="widget_empty">暂无事件</string>
+    <string name="widget_tap_to_add">点按打开 The Day</string>
+    <string name="widget_relation_countdown">倒数</string>
+    <string name="widget_relation_countup">正数</string>
+    <string name="widget_unit_days">天</string>
+    <string name="widget_today">今天</string>
+    <string name="widget_description">显示置顶事件或最近事件的小组件</string>
+</resources>
