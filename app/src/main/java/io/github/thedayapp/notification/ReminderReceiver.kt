@@ -12,6 +12,7 @@ import io.github.thedayapp.data.DayRepository
 import io.github.thedayapp.data.RepeatMode
 import io.github.thedayapp.domain.DayMath
 import io.github.thedayapp.widget.DayWidgetProvider
+import io.github.thedayapp.widget.MonthCalendarWidgetProvider
 import java.time.LocalDate
 import kotlin.math.abs
 
@@ -62,5 +63,6 @@ class ReminderReceiver : BroadcastReceiver() {
             ReminderScheduler.schedule(context, event, settings)
         }
         DayWidgetProvider.requestUpdate(context)
+        MonthCalendarWidgetProvider.requestUpdate(context)
     }
 }

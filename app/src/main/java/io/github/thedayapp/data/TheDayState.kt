@@ -9,6 +9,7 @@ import io.github.thedayapp.domain.normalizedCategoryName
 import io.github.thedayapp.media.LocalImageStore
 import io.github.thedayapp.notification.ReminderScheduler
 import io.github.thedayapp.widget.DayWidgetProvider
+import io.github.thedayapp.widget.MonthCalendarWidgetProvider
 import java.time.LocalDate
 
 class TheDayState(context: Context) {
@@ -64,6 +65,7 @@ class TheDayState(context: Context) {
         repository.saveEvents(events)
         ReminderScheduler.schedule(appContext, event, settings)
         DayWidgetProvider.requestUpdate(appContext)
+        MonthCalendarWidgetProvider.requestUpdate(appContext)
 
         if (previousImageFileName != event.backgroundImage?.fileName) {
             deleteImageIfUnreferenced(previousImageFileName)
@@ -78,6 +80,7 @@ class TheDayState(context: Context) {
         events = events.filterNot { it.id == id }
         repository.saveEvents(events)
         DayWidgetProvider.requestUpdate(appContext)
+        MonthCalendarWidgetProvider.requestUpdate(appContext)
 
         deleteImageIfUnreferenced(removedImageFileName)
     }
@@ -92,6 +95,7 @@ class TheDayState(context: Context) {
         repository.saveSettings(newSettings)
         ReminderScheduler.rescheduleAll(appContext, events, newSettings)
         DayWidgetProvider.requestUpdate(appContext)
+        MonthCalendarWidgetProvider.requestUpdate(appContext)
     }
 
     fun clearAllEvents() {
@@ -103,6 +107,7 @@ class TheDayState(context: Context) {
         events = emptyList()
         repository.saveEvents(events)
         DayWidgetProvider.requestUpdate(appContext)
+        MonthCalendarWidgetProvider.requestUpdate(appContext)
 
         imageFileNames.forEach { fileName ->
             deleteImageIfUnreferenced(fileName)

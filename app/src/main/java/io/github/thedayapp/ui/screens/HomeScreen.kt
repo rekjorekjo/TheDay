@@ -10,9 +10,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -23,9 +27,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,11 +42,14 @@ import androidx.compose.foundation.lazy.items
 import io.github.thedayapp.data.TheDayState
 import io.github.thedayapp.domain.DayMath
 import io.github.thedayapp.domain.EventOrdering
+import io.github.thedayapp.ui.components.EventCalendarSheet
 import io.github.thedayapp.ui.components.EventCard
 import io.github.thedayapp.ui.components.HeroCard
 import io.github.thedayapp.ui.components.TheDayMark
+import io.github.thedayapp.ui.components.TodayCalendarMark
 import io.github.thedayapp.util.DateFormatting
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private enum class HomeFilter {
     ALL,
@@ -56,6 +67,14 @@ fun HomeScreen(
     val locale = Locale.getDefault()
     var filter by remember { mutableStateOf(HomeFilter.ALL) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var showCalendarSheet by rememberSaveable { mutableStateOf(false) }
+
+    val monthProgress = (
+        state.today.dayOfMonth.toFloat() /
+            state.today.lengthOfMonth().toFloat()
+    ).coerceIn(minimumValue = 0f, maximumValue = 1f)
+
+    val monthProgressPercent = (monthProgress * 100f).roundToInt()
 
     val settingsVisible = state.events.filter {
         state.settings.showPastEvents || !DayMath.isPast(it, state.today)
@@ -84,6 +103,16 @@ fun HomeScreen(
     val sorted = EventOrdering.sort(filtered, state.settings.sortMode, state.settings.sortDirection, state.today)
     val hero = EventOrdering.heroEvent(settingsVisible, state.today)
 
+    if (showCalendarSheet) {
+        EventCalendarSheet(
+            today = state.today,
+            events = state.events,
+            onDismissRequest = {
+                showCalendarSheet = false
+            },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -95,7 +124,12 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        TheDayMark(size = 34.dp)
+                        TodayCalendarMark(
+                            today = state.today,
+                            onClick = {
+                                showCalendarSheet = true
+                            },
+                        )
                         Column {
                             Text(
                                 text = "THE DAY",
@@ -103,11 +137,31 @@ fun HomeScreen(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 2.sp,
                             )
-                            Text(
-                                text = "${DateFormatting.compactDate(state.today, locale)} · ${DateFormatting.weekday(state.today, locale)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .widthIn(min = 118.dp, max = 150.dp)
+                                    .semantics {
+                                        contentDescription = "本月已过去 $monthProgressPercent%"
+                                    },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                LinearProgressIndicator(
+                                    progress = monthProgress,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(percent = 50)),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "$monthProgressPercent%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
                         }
                     }
                 },

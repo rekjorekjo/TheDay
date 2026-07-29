@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import io.github.thedayapp.data.DayRepository
 import io.github.thedayapp.widget.DayWidgetProvider
+import io.github.thedayapp.widget.MonthCalendarWidgetProvider
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -23,5 +24,6 @@ class BootReceiver : BroadcastReceiver() {
             repository.loadSettings(),
         )
         DayWidgetProvider.requestUpdate(context)
+        MonthCalendarWidgetProvider.requestUpdate(context)
     }
 }

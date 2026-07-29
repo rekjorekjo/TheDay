@@ -543,13 +543,8 @@ private fun AboutAndUpdateSettingsCard() {
 
     SettingsCard(
         icon = Icons.Rounded.Info,
-        title = "关于",
+        title = "关于 The Day",
     ) {
-        Text(
-            text = "The Day",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Spacer(Modifier.height(6.dp))
         Text(
             text = context.getString(R.string.update_current_version, BuildConfig.VERSION_NAME),
             style = MaterialTheme.typography.bodyMedium,

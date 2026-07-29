@@ -135,25 +135,25 @@ fun HeroCard(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = event.title,
+                            modifier = Modifier.weight(weight = 1f, fill = false),
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (hasBackgroundImage) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        if (delta != 0L) {
+                            Spacer(Modifier.width(6.dp))
                             Text(
-                                text = event.title,
-                                style = MaterialTheme.typography.titleLarge,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                color = if (hasBackgroundImage) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                text = DateFormatting.longDate(
-                                    DayMath.effectiveDate(event, today),
-                                    locale,
-                                ),
+                                text = if (delta > 0L) "还有" else "已经",
                                 style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
                                 color = if (hasBackgroundImage) Color.White.copy(alpha = 0.84f) else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         if (event.isPinned) {
+                            Spacer(Modifier.width(6.dp))
                             Icon(
                                 imageVector = Icons.Rounded.VerticalAlignTop,
                                 contentDescription = "已置顶",
@@ -161,6 +161,15 @@ fun HeroCard(
                             )
                         }
                     }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = DateFormatting.longDate(
+                            DayMath.effectiveDate(event, today),
+                            locale,
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (hasBackgroundImage) Color.White.copy(alpha = 0.84f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Spacer(Modifier.height(28.dp))
                     if (delta == 0L) {
                         Text(
@@ -170,13 +179,6 @@ fun HeroCard(
                         )
                     } else {
                         Row(verticalAlignment = Alignment.Bottom) {
-                            Text(
-                                text = if (delta > 0) "倒数" else "正数",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (hasBackgroundImage) Color.White.copy(alpha = 0.84f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 10.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
                             Text(
                                 text = abs(delta).toString(),
                                 style = MaterialTheme.typography.displayLarge,
@@ -225,14 +227,29 @@ fun EventCard(
             )
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         text = event.title,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier.weight(
+                            weight = 1f,
+                            fill = false,
+                        ),
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    if (delta != 0L) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (delta > 0L) "还有" else "已经",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
                     if (event.isPinned) {
                         Spacer(Modifier.width(6.dp))
                         Icon(
@@ -274,11 +291,6 @@ fun EventCard(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 } else {
-                    Text(
-                        text = if (delta > 0) "倒数" else "正数",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
                             text = abs(delta).toString(),

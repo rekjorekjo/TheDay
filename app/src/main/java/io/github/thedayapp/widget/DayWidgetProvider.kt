@@ -190,36 +190,29 @@ class DayWidgetProvider : AppWidgetProvider() {
                 }
             } else {
                 val delta = DayMath.signedDays(event, today)
-                views.setTextViewText(R.id.widget_title, event.title)
                 if (delta == 0L) {
+                    views.setTextViewText(R.id.widget_title, event.title)
                     views.setViewVisibility(R.id.widget_relation, View.GONE)
                     views.setTextViewText(R.id.widget_count, context.getString(R.string.widget_today))
                     views.setViewVisibility(R.id.widget_count, View.VISIBLE)
                     views.setViewVisibility(R.id.widget_unit, View.GONE)
                 } else {
+                    val relationText = if (delta > 0) {
+                        context.getString(R.string.widget_relation_countdown)
+                    } else {
+                        context.getString(R.string.widget_relation_countup)
+                    }
+                    views.setTextViewText(R.id.widget_title, "${event.title} $relationText")
+                    views.setViewVisibility(R.id.widget_relation, View.GONE)
+
                     if (compact) {
-                        val relationText = if (delta > 0) {
-                            context.getString(R.string.widget_relation_countdown)
-                        } else {
-                            context.getString(R.string.widget_relation_countup)
-                        }
                         views.setTextViewText(
                             R.id.widget_count,
-                            "$relationText ${abs(delta)} ${context.getString(R.string.widget_unit_days)}",
+                            "${abs(delta)} ${context.getString(R.string.widget_unit_days)}",
                         )
-                        views.setViewVisibility(R.id.widget_relation, View.GONE)
                         views.setViewVisibility(R.id.widget_count, View.VISIBLE)
                         views.setViewVisibility(R.id.widget_unit, View.GONE)
                     } else {
-                        views.setTextViewText(
-                            R.id.widget_relation,
-                            if (delta > 0) {
-                                context.getString(R.string.widget_relation_countdown)
-                            } else {
-                                context.getString(R.string.widget_relation_countup)
-                            },
-                        )
-                        views.setViewVisibility(R.id.widget_relation, View.VISIBLE)
                         views.setTextViewText(R.id.widget_count, abs(delta).toString())
                         views.setViewVisibility(R.id.widget_count, View.VISIBLE)
                         views.setTextViewText(R.id.widget_unit, context.getString(R.string.widget_unit_days))

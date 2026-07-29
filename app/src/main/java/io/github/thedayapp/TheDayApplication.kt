@@ -5,6 +5,7 @@ import io.github.thedayapp.data.DayRepository
 import io.github.thedayapp.notification.NotificationChannels
 import io.github.thedayapp.notification.ReminderScheduler
 import io.github.thedayapp.widget.DayWidgetProvider
+import io.github.thedayapp.widget.MonthCalendarWidgetProvider
 
 class TheDayApplication : Application() {
     override fun onCreate() {
@@ -17,5 +18,6 @@ class TheDayApplication : Application() {
             repository.loadSettings(),
         )
         DayWidgetProvider.requestUpdate(this)
+        MonthCalendarWidgetProvider.requestUpdate(this)
     }
 }
