@@ -4,43 +4,62 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.VerticalAlignTop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.thedayapp.data.DayEvent
+import io.github.thedayapp.data.ImagePlacementTarget
+import io.github.thedayapp.data.ImageTransform
 import io.github.thedayapp.data.RepeatMode
 import io.github.thedayapp.domain.DayMath
-import io.github.thedayapp.ui.media.localImageAlignment
+import io.github.thedayapp.ui.media.EventImageCardType
+import io.github.thedayapp.ui.media.adaptiveEventImageMinimumHeight
+import io.github.thedayapp.ui.media.LocalImageViewport
+import io.github.thedayapp.ui.media.TransformableLocalImageViewport
 import io.github.thedayapp.ui.media.rememberLocalImageBitmap
 import io.github.thedayapp.util.DateFormatting
 import java.time.LocalDate
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlin.math.abs
 
 @Composable
@@ -49,10 +68,16 @@ fun HeroCard(
     today: LocalDate,
     locale: Locale,
     onClick: (() -> Unit)?,
+    onAdjustImage: (() -> Unit)? = null,
+    onImageTransformChange: ((ImageTransform) -> Unit)? = null,
     modifier: Modifier = Modifier,
     emptyTitle: String,
 ) {
-    val clickModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    val clickModifier = if (onClick != null) {
+        Modifier.clickable(onClick = onClick)
+    } else {
+        Modifier
+    }
 
     val imageReference = event?.backgroundImage
     val imageBitmap = rememberLocalImageBitmap(
@@ -60,142 +85,290 @@ fun HeroCard(
         maxDecodeLongEdgePx = 1280,
     )
     val hasBackgroundImage = imageReference != null && imageBitmap != null
+    val persistedTransform = imageReference?.transformFor(
+        ImagePlacementTarget.HOME,
+    ) ?: ImageTransform()
+    var liveTransform by remember(
+        event?.id,
+        imageReference?.fileName,
+    ) {
+        mutableStateOf(persistedTransform)
+    }
+
+    LaunchedEffect(persistedTransform) {
+        if (liveTransform != persistedTransform) {
+            liveTransform = persistedTransform
+        }
+    }
+
+    LaunchedEffect(liveTransform, persistedTransform) {
+        if (
+            onImageTransformChange != null &&
+            liveTransform != persistedTransform
+        ) {
+            delay(320)
+            onImageTransformChange(liveTransform)
+        }
+    }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .then(clickModifier),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clipToBounds(),
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            if (hasBackgroundImage && imageBitmap != null) {
-                androidx.compose.foundation.Image(
-                    bitmap = imageBitmap,
-                    contentDescription = null,
-                    modifier = Modifier.matchParentSize(),
-                    contentScale = ContentScale.Crop,
-                    alignment = localImageAlignment(imageReference!!),
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.18f),
-                                    Color.Black.copy(alpha = 0.38f),
-                                    Color.Black.copy(alpha = 0.66f),
-                                ),
-                            ),
-                        ),
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primaryContainer,
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                ),
-                            ),
-                        ),
-                )
-            }
+            val adaptiveMinimumHeight = adaptiveEventImageMinimumHeight(
+                availableWidth = maxWidth,
+                image = imageReference,
+                type = EventImageCardType.HOME_HERO,
+            )
 
-            if (event == null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 26.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
-                ) {
-                    TheDayMark(size = 46.dp)
-                    Text(
-                        text = emptyTitle,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = if (hasBackgroundImage) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (adaptiveMinimumHeight != null) {
+                            Modifier.heightIn(min = adaptiveMinimumHeight)
+                        } else {
+                            Modifier
+                        },
                     )
-                }
-            } else {
-                val delta = DayMath.signedDays(event, today)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 26.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = event.title,
-                            modifier = Modifier.weight(weight = 1f, fill = false),
-                            style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = if (hasBackgroundImage) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        if (delta != 0L) {
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = if (delta > 0L) "还有" else "已经",
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                color = if (hasBackgroundImage) Color.White.copy(alpha = 0.84f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (event.isPinned) {
-                            Spacer(Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.Rounded.VerticalAlignTop,
-                                contentDescription = "已置顶",
-                                tint = if (hasBackgroundImage) Color.White else MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = DateFormatting.longDate(
-                            DayMath.effectiveDate(event, today),
-                            locale,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hasBackgroundImage) Color.White.copy(alpha = 0.84f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(28.dp))
-                    if (delta == 0L) {
-                        Text(
-                            text = "今天",
-                            style = MaterialTheme.typography.displayLarge,
-                            color = if (hasBackgroundImage) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
+                    .clipToBounds(),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (hasBackgroundImage && imageBitmap != null) {
+                    if (onImageTransformChange != null) {
+                        TransformableLocalImageViewport(
+                            bitmap = imageBitmap,
+                            transform = liveTransform,
+                            onTransformChange = { updated ->
+                                liveTransform = updated
+                            },
+                            modifier = Modifier.matchParentSize(),
                         )
                     } else {
-                        Row(verticalAlignment = Alignment.Bottom) {
+                        LocalImageViewport(
+                            bitmap = imageBitmap,
+                            transform = persistedTransform,
+                            modifier = Modifier.matchParentSize(),
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.Black.copy(alpha = 0.18f),
+                                        Color.Black.copy(alpha = 0.38f),
+                                        Color.Black.copy(alpha = 0.66f),
+                                    ),
+                                ),
+                            ),
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                    ),
+                                ),
+                            ),
+                    )
+                }
+
+                if (event == null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 26.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    ) {
+                        TheDayMark(size = 46.dp)
+                        Text(
+                            text = emptyTitle,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = if (hasBackgroundImage) {
+                                Color.White
+                            } else {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            },
+                        )
+                    }
+                } else {
+                    val delta = DayMath.signedDays(event, today)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 26.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(end = if (hasBackgroundImage) 42.dp else 0.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Text(
-                                text = abs(delta).toString(),
-                                style = MaterialTheme.typography.displayLarge,
-                                color = if (hasBackgroundImage) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
+                                text = event.title,
+                                modifier = Modifier.weight(
+                                    weight = 1f,
+                                    fill = false,
+                                ),
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = if (hasBackgroundImage) {
+                                    Color.White
+                                } else {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                },
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "天",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (hasBackgroundImage) Color.White.copy(alpha = 0.84f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 10.dp),
-                            )
+                            if (delta != 0L) {
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = if (delta > 0L) "还有" else "已经",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    color = if (hasBackgroundImage) {
+                                        Color.White.copy(alpha = 0.84f)
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                            }
                         }
+                        Spacer(Modifier.height(28.dp))
+                        if (delta == 0L) {
+                            Text(
+                                text = "今天",
+                                style = MaterialTheme.typography.displayLarge,
+                                color = if (hasBackgroundImage) {
+                                    Color.White
+                                } else {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                },
+                            )
+                        } else {
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                HaloText(
+                                    text = abs(delta).toString(),
+                                    style = MaterialTheme.typography.displayLarge,
+                                    color = if (hasBackgroundImage) {
+                                        Color.White
+                                    } else {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    },
+                                    glowColor = MaterialTheme.colorScheme.primary,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "天",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (hasBackgroundImage) {
+                                        Color.White.copy(alpha = 0.84f)
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    modifier = Modifier.padding(bottom = 10.dp),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = DateFormatting.longDate(
+                                DayMath.effectiveDate(event, today),
+                                locale,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (hasBackgroundImage) {
+                                Color.White.copy(alpha = 0.84f)
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+
+                if (
+                    hasBackgroundImage &&
+                    onAdjustImage != null
+                ) {
+                    IconButton(
+                        onClick = onAdjustImage,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.32f)),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.TouchApp,
+                            contentDescription = "调整首页图片",
+                            tint = Color.White,
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun HaloText(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    glowColor: Color,
+) {
+    val innerGlowColor = lerp(
+        start = glowColor,
+        stop = Color.White,
+        fraction = 0.20f,
+    )
+
+    Box(
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = text,
+            style = style.copy(
+                shadow = Shadow(
+                    color = glowColor.copy(alpha = 0.82f),
+                    offset = Offset.Zero,
+                    blurRadius = 34f,
+                ),
+            ),
+            color = glowColor.copy(alpha = 0.18f),
+        )
+        Text(
+            text = text,
+            style = style.copy(
+                shadow = Shadow(
+                    color = innerGlowColor.copy(alpha = 0.72f),
+                    offset = Offset.Zero,
+                    blurRadius = 13f,
+                ),
+            ),
+            color = innerGlowColor.copy(alpha = 0.10f),
+        )
+        Text(
+            text = text,
+            style = style,
+            color = color,
+        )
     }
 }
 
@@ -207,6 +380,13 @@ fun EventCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Warm the shared image cache while the row is visible. The list itself
+    // remains text-only, but opening the detail screen can reuse this decode.
+    rememberLocalImageBitmap(
+        image = event.backgroundImage,
+        maxDecodeLongEdgePx = 1280,
+    )
+
     val delta = DayMath.signedDays(event, today)
     Card(
         modifier = modifier

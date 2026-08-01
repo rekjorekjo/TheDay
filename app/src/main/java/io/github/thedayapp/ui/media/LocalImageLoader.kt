@@ -2,6 +2,7 @@ package io.github.thedayapp.ui.media
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.LruCache
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -14,16 +15,55 @@ import androidx.compose.ui.platform.LocalContext
 import io.github.thedayapp.data.LocalImageReference
 import io.github.thedayapp.media.LocalImageStore
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.roundToInt
 
-private data class LoadedLocalImage(
-    val fileName: String,
-    val maxDecodeLongEdgePx: Int,
-    val bitmap: Bitmap,
+private data class CachedLocalImage(
+    val imageBitmap: ImageBitmap,
+    val byteCount: Int,
 )
+
+/**
+ * Keeps recently decoded images alive across screen changes and lazy-list
+ * disposal. File names are unique, so a new crop naturally receives a new
+ * cache key and cannot reuse stale pixels.
+ */
+private object LocalImageMemoryCache {
+    private const val ABSOLUTE_MAX_BYTES = 64 * 1024 * 1024
+
+    private val maxBytes = minOf(
+        ABSOLUTE_MAX_BYTES,
+        (Runtime.getRuntime().maxMemory() / 12L)
+            .coerceAtLeast(12L * 1024L * 1024L)
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt(),
+    )
+
+    private val cache = object : LruCache<String, CachedLocalImage>(maxBytes) {
+        override fun sizeOf(key: String, value: CachedLocalImage): Int {
+            return value.byteCount.coerceAtLeast(1)
+        }
+    }
+
+    @Synchronized
+    fun get(key: String): ImageBitmap? = cache.get(key)?.imageBitmap
+
+    @Synchronized
+    fun put(
+        key: String,
+        imageBitmap: ImageBitmap,
+        byteCount: Int,
+    ) {
+        cache.put(
+            key,
+            CachedLocalImage(
+                imageBitmap = imageBitmap,
+                byteCount = byteCount,
+            ),
+        )
+    }
+}
 
 @Composable
 fun rememberLocalImageBitmap(
@@ -37,75 +77,50 @@ fun rememberLocalImageBitmap(
 
     val requestedFileName = image?.fileName
     val safeMaxDecodeLongEdgePx = maxDecodeLongEdgePx.coerceAtLeast(1)
+    val cacheKey = requestedFileName?.let { fileName ->
+        "$fileName@$safeMaxDecodeLongEdgePx"
+    }
 
-    val loadedImage by produceState<LoadedLocalImage?>(
-        initialValue = null,
-        key1 = requestedFileName,
-        key2 = safeMaxDecodeLongEdgePx,
+    val loadedImage by produceState<ImageBitmap?>(
+        initialValue = cacheKey?.let(LocalImageMemoryCache::get),
+        key1 = cacheKey,
     ) {
-        if (requestedFileName == null) {
+        if (requestedFileName == null || cacheKey == null) {
             value = null
             return@produceState
         }
 
-        var decodedBitmap: Bitmap? = null
+        LocalImageMemoryCache.get(cacheKey)?.let { cached ->
+            value = cached
+            return@produceState
+        }
 
-        try {
-            val fileName = requestedFileName
+        val decodedBitmap = withContext(Dispatchers.IO) {
+            val file = imageStore.fileFor(requestedFileName)
+                ?: return@withContext null
 
-            withContext(Dispatchers.IO) {
-                val file = imageStore.fileFor(fileName)
-                    ?: return@withContext
-
-                decodedBitmap = decodeLocalImage(
-                    file = file,
-                    maxLongEdge = safeMaxDecodeLongEdgePx,
-                )
-            }
-
-            val loadedBitmap = decodedBitmap
-                ?: return@produceState
-
-            value = LoadedLocalImage(
-                fileName = fileName,
-                maxDecodeLongEdgePx = safeMaxDecodeLongEdgePx,
-                bitmap = loadedBitmap,
+            decodeLocalImage(
+                file = file,
+                maxLongEdge = safeMaxDecodeLongEdgePx,
             )
+        } ?: return@produceState
 
-            awaitCancellation()
-        } finally {
-            val bitmapToRecycle = decodedBitmap
+        val imageBitmap = decodedBitmap.asImageBitmap()
+        val byteCount = runCatching {
+            decodedBitmap.allocationByteCount
+        }.getOrDefault(
+            decodedBitmap.width * decodedBitmap.height * 4,
+        )
 
-            if (
-                bitmapToRecycle != null &&
-                value?.bitmap === bitmapToRecycle
-            ) {
-                value = null
-            }
-
-            if (
-                bitmapToRecycle != null &&
-                !bitmapToRecycle.isRecycled
-            ) {
-                bitmapToRecycle.recycle()
-            }
-        }
+        LocalImageMemoryCache.put(
+            key = cacheKey,
+            imageBitmap = imageBitmap,
+            byteCount = byteCount,
+        )
+        value = imageBitmap
     }
 
-    val matchingBitmap = loadedImage
-        ?.takeIf { loaded ->
-            loaded.fileName == requestedFileName &&
-                loaded.maxDecodeLongEdgePx == safeMaxDecodeLongEdgePx
-        }
-        ?.bitmap
-
-    return remember(
-        matchingBitmap,
-        requestedFileName,
-        safeMaxDecodeLongEdgePx,
-    ) {
-        matchingBitmap?.asImageBitmap()
-    }
+    return loadedImage
 }
 
 internal fun localImageAlignment(
@@ -220,7 +235,7 @@ private fun decodeLocalImage(
         }
 
         return scaledBitmap
-    } catch (exception: Exception) {
+    } catch (_: Exception) {
         sampledBitmap?.let { bitmap ->
             if (!bitmap.isRecycled) {
                 bitmap.recycle()

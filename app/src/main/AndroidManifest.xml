@@ -32,9 +32,29 @@
         </provider>
 
         <activity
-            android:name=".WidgetPinActivity"
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
+        <activity
+            android:name=".ui.media.EdgeHandleUCropActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
+        <activity
+            android:name=".widget.DayWidgetConfigureActivity"
             android:excludeFromRecents="true"
             android:exported="true"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".WidgetPinActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
             android:finishOnTaskLaunch="true"
             android:noHistory="true"
             android:taskAffinity=""
@@ -48,9 +68,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
         </activity>
 
         <receiver
@@ -68,6 +85,10 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".widget.WidgetPinResultReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".widget.DayWidgetProvider"

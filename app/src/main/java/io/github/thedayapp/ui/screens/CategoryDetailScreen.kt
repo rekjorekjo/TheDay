@@ -32,12 +32,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import io.github.thedayapp.R
 import io.github.thedayapp.data.TheDayState
 import io.github.thedayapp.domain.EventOrdering
 import io.github.thedayapp.ui.components.EventCard
-import io.github.thedayapp.ui.media.ImageFocusDialog
-import io.github.thedayapp.ui.media.ImageFocusPreviewMode
+import io.github.thedayapp.ui.media.deleteTemporaryPickerImage
+import io.github.thedayapp.ui.media.rememberImageRecropLauncher
 import io.github.thedayapp.ui.media.rememberSingleImagePickerLauncher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -51,6 +53,7 @@ fun CategoryDetailScreen(
     onBack: () -> Unit,
     onOpenEvent: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     val locale = Locale.getDefault()
     val categoryEvents = remember(state.events, categoryName) {
         state.events.filter { event ->
@@ -73,42 +76,112 @@ fun CategoryDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var coverMenuExpanded by remember { mutableStateOf(false) }
     var isImportingCover by remember { mutableStateOf(false) }
-    var showCoverFocusDialog by remember { mutableStateOf(false) }
 
-    val launchCoverPicker = rememberSingleImagePickerLauncher { uri ->
-        if (isImportingCover) {
-            return@rememberSingleImagePickerLauncher
-        }
-
-        coroutineScope.launch {
-            isImportingCover = true
-
-            try {
-                val result = try {
-                    state.importLocalImage(uri)
-                } catch (exception: CancellationException) {
-                    throw exception
-                } catch (exception: Exception) {
-                    Result.failure(exception)
-                }
-
-                val importedCover = result.getOrNull()
-
-                if (importedCover != null) {
-                    state.updateCategoryCover(
-                        categoryName = categoryName,
-                        image = importedCover,
-                    )
-                } else {
-                    snackbarHostState.showSnackbar(
-                        message = "封面导入失败，请重试",
-                    )
-                }
-            } finally {
-                isImportingCover = false
+    val launchCoverPicker = rememberSingleImagePickerLauncher(
+        onImagePicked = { selection ->
+            if (isImportingCover) {
+                deleteTemporaryPickerImage(context, selection.originalUri)
+                deleteTemporaryPickerImage(context, selection.croppedUri)
+                return@rememberSingleImagePickerLauncher
             }
-        }
-    }
+
+            coroutineScope.launch {
+                isImportingCover = true
+
+                try {
+                    val result = try {
+                        state.importLocalImage(
+                            selection.originalUri,
+                            selection.croppedUri,
+                        )
+                    } catch (exception: CancellationException) {
+                        throw exception
+                    } catch (exception: Exception) {
+                        Result.failure(exception)
+                    }
+
+                    val importedCover = result.getOrNull()
+
+                    if (importedCover != null) {
+                        state.updateCategoryCover(
+                            categoryName = categoryName,
+                            image = importedCover,
+                        )
+                    } else {
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(
+                                R.string.cover_import_failed,
+                            ),
+                        )
+                    }
+                } finally {
+                    deleteTemporaryPickerImage(context, selection.originalUri)
+                    deleteTemporaryPickerImage(context, selection.croppedUri)
+                    isImportingCover = false
+                }
+            }
+        },
+        onCropFailed = {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(
+                    message = context.getString(
+                        R.string.cover_crop_failed,
+                    ),
+                )
+            }
+        },
+    )
+
+    val launchCoverRecrop = rememberImageRecropLauncher(
+        image = currentCover,
+        onImageCropped = { croppedUri ->
+            val cover = currentCover
+            if (cover == null || isImportingCover) {
+                deleteTemporaryPickerImage(context, croppedUri)
+                return@rememberImageRecropLauncher
+            }
+
+            coroutineScope.launch {
+                isImportingCover = true
+
+                try {
+                    val result = try {
+                        state.recropLocalImage(cover, croppedUri)
+                    } catch (exception: CancellationException) {
+                        throw exception
+                    } catch (exception: Exception) {
+                        Result.failure(exception)
+                    }
+
+                    val recroppedCover = result.getOrNull()
+                    if (recroppedCover != null) {
+                        state.updateCategoryCover(
+                            categoryName = categoryName,
+                            image = recroppedCover,
+                        )
+                    } else {
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(
+                                R.string.cover_crop_failed,
+                            ),
+                        )
+                    }
+                } finally {
+                    deleteTemporaryPickerImage(context, croppedUri)
+                    isImportingCover = false
+                }
+            }
+        },
+        onCropFailed = {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(
+                    message = context.getString(
+                        R.string.cover_crop_failed,
+                    ),
+                )
+            }
+        },
+    )
 
     Scaffold(
         topBar = {
@@ -167,10 +240,10 @@ fun CategoryDetailScreen(
                                 )
                             } else {
                                 DropdownMenuItem(
-                                    text = { Text("调整位置") },
+                                    text = { Text("重新裁剪") },
                                     onClick = {
                                         coverMenuExpanded = false
-                                        showCoverFocusDialog = true
+                                        launchCoverRecrop()
                                     },
                                 )
                                 DropdownMenuItem(
@@ -250,19 +323,4 @@ fun CategoryDetailScreen(
         }
     }
 
-    val coverForFocus = currentCover
-    if (showCoverFocusDialog && coverForFocus != null) {
-        ImageFocusDialog(
-            image = coverForFocus,
-            mode = ImageFocusPreviewMode.CATEGORY_COVER,
-            onDismiss = { showCoverFocusDialog = false },
-            onConfirm = { adjustedCover ->
-                state.updateCategoryCover(
-                    categoryName = categoryName,
-                    image = adjustedCover,
-                )
-                showCoverFocusDialog = false
-            },
-        )
-    }
 }

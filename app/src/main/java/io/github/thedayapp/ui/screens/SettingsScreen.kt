@@ -1,10 +1,7 @@
 package io.github.thedayapp.ui.screens
 
 import android.Manifest
-import android.app.Activity
 import android.app.TimePickerDialog
-import android.content.Context
-import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,7 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Sort
@@ -40,6 +37,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -50,33 +48,24 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import io.github.thedayapp.BuildConfig
-import io.github.thedayapp.MainActivity
 import io.github.thedayapp.R
 import io.github.thedayapp.data.PaletteStyle
 import io.github.thedayapp.data.SortDirection
 import io.github.thedayapp.data.SortMode
 import io.github.thedayapp.data.ThemeMode
 import io.github.thedayapp.data.TheDayState
-import io.github.thedayapp.update.AppUpdateManager
-import io.github.thedayapp.update.UpdateCheckResult
-import io.github.thedayapp.update.UpdateDownloadState
-import io.github.thedayapp.update.UpdatePreferences
 import io.github.thedayapp.ui.theme.palettePreviewColor
 import io.github.thedayapp.util.DateFormatting
 
@@ -85,6 +74,7 @@ import io.github.thedayapp.util.DateFormatting
 fun SettingsScreen(
     state: TheDayState,
     bottomBar: @Composable () -> Unit,
+    onOpenAbout: () -> Unit,
 ) {
     val context = LocalContext.current
     var confirmClear by remember { mutableStateOf(false) }
@@ -100,11 +90,31 @@ fun SettingsScreen(
 
     Scaffold(
         topBar = {
+            val topBarBackground = MaterialTheme.colorScheme.background
+            val topBarContent = MaterialTheme.colorScheme.onBackground
+
             TopAppBar(
+                modifier = Modifier.background(topBarBackground),
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    // Material 3 animates the app-bar container color. When
+                    // switching light/dark mode that left the old color on
+                    // screen for several frames. Draw the background directly
+                    // on the modifier and keep the internal container clear.
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                    titleContentColor = topBarContent,
+                    navigationIconContentColor = topBarContent,
+                    actionIconContentColor = topBarContent,
                 ),
-                title = { Text("设置") },
+                title = { Text(stringResource(R.string.settings)) },
+                actions = {
+                    IconButton(onClick = onOpenAbout) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreHoriz,
+                            contentDescription = stringResource(R.string.about_the_day),
+                        )
+                    }
+                },
             )
         },
         bottomBar = bottomBar,
@@ -330,8 +340,6 @@ fun SettingsScreen(
                 }
             }
 
-            AboutAndUpdateSettingsCard()
-
             OutlinedButton(
                 onClick = { confirmClear = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -373,6 +381,7 @@ fun SettingsScreen(
 private fun SettingsCard(
     icon: ImageVector,
     title: String,
+    trailingAction: @Composable (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Card(
@@ -382,15 +391,21 @@ private fun SettingsCard(
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )
-                Text(title, style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                trailingAction?.invoke()
             }
             Spacer(Modifier.height(16.dp))
             content()
@@ -497,214 +512,4 @@ private fun SwitchRow(
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
-}
-
-@Composable
-private fun AboutAndUpdateSettingsCard() {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val updateManager = remember { AppUpdateManager(context) }
-    val preferences = remember { UpdatePreferences(context) }
-
-    var isChecking by remember { mutableStateOf(false) }
-    var checkMessage by remember { mutableStateOf<String?>(null) }
-    var wifiOnly by remember { mutableStateOf(preferences.wifiOnly) }
-    var downloadStatus by remember { mutableStateOf(updateManager.currentStatus()) }
-    var isVerifyingLocally by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        while (isActive) {
-            downloadStatus = updateManager.currentStatus()
-
-            delay(
-                when (downloadStatus.state) {
-                    UpdateDownloadState.WAITING,
-                    UpdateDownloadState.DOWNLOADING,
-                    UpdateDownloadState.VERIFYING -> 1000L
-
-                    else -> 3000L
-                },
-            )
-        }
-    }
-
-    LaunchedEffect(downloadStatus.state) {
-        if (downloadStatus.state == UpdateDownloadState.VERIFYING && !isVerifyingLocally) {
-            isVerifyingLocally = true
-
-            try {
-                updateManager.verifyPendingDownloadIfNeeded()
-            } finally {
-                isVerifyingLocally = false
-                downloadStatus = updateManager.currentStatus()
-            }
-        }
-    }
-
-    SettingsCard(
-        icon = Icons.Rounded.Info,
-        title = "关于 The Day",
-    ) {
-        Text(
-            text = context.getString(R.string.update_current_version, BuildConfig.VERSION_NAME),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = "本地倒数日与纪念日",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Spacer(Modifier.height(18.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(18.dp))
-
-        SwitchRow(
-            title = context.getString(R.string.update_wifi_only_title),
-            description = context.getString(R.string.update_wifi_only_description),
-            checked = wifiOnly,
-            onCheckedChange = { newValue ->
-                wifiOnly = newValue
-                preferences.wifiOnly = newValue
-            },
-        )
-        Spacer(Modifier.height(18.dp))
-
-        val downloadBusy = downloadStatus.state == UpdateDownloadState.WAITING ||
-            downloadStatus.state == UpdateDownloadState.DOWNLOADING ||
-            downloadStatus.state == UpdateDownloadState.VERIFYING
-
-        val buttonEnabled = !isChecking && !downloadBusy
-
-        OutlinedButton(
-            onClick = {
-                coroutineScope.launch {
-                    isChecking = true
-                    checkMessage = null
-
-                    try {
-                        when (val result = updateManager.checkForUpdate()) {
-                            is UpdateCheckResult.UpdateAvailable -> {
-                                val started = updateManager.startDownload(result.release)
-                                if (started) {
-                                    checkMessage = context.getString(
-                                        R.string.update_downloading,
-                                        result.release.versionName,
-                                    )
-                                } else {
-                                    checkMessage = context.getString(R.string.update_download_failed)
-                                }
-                            }
-
-                            UpdateCheckResult.UpToDate -> {
-                                checkMessage = context.getString(R.string.update_upto_date)
-                            }
-
-                            UpdateCheckResult.CheckFailed -> {
-                                checkMessage = context.getString(R.string.update_failed)
-                            }
-                        }
-
-                        downloadStatus = updateManager.currentStatus()
-                    } finally {
-                        isChecking = false
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = buttonEnabled,
-        ) {
-            Text(
-                if (isChecking) {
-                    context.getString(R.string.update_checking)
-                } else {
-                    context.getString(R.string.update_check_button)
-                },
-            )
-        }
-
-        checkMessage?.let { message ->
-            Spacer(Modifier.height(12.dp))
-            Text(
-                message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        when (downloadStatus.state) {
-            UpdateDownloadState.WAITING -> {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    context.getString(R.string.update_waiting_network),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            UpdateDownloadState.DOWNLOADING -> {
-                Spacer(Modifier.height(12.dp))
-                val progressPercent = downloadStatus.progressPercent
-                Text(
-                    if (progressPercent != null) {
-                        context.getString(R.string.update_downloading_progress, progressPercent)
-                    } else {
-                        context.getString(R.string.update_downloading_without_progress)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            UpdateDownloadState.VERIFYING -> {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    context.getString(R.string.update_verifying),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            UpdateDownloadState.READY -> {
-                val versionName = downloadStatus.versionName
-                if (versionName != null) {
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        context.getString(R.string.update_ready, versionName),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = {
-                        val activity = context.findActivity()
-                        if (activity != null) {
-                            updateManager.requestInstall(activity)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(context.getString(R.string.update_install_button))
-                }
-            }
-            UpdateDownloadState.FAILED -> {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    context.getString(R.string.update_download_failed),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            else -> {}
-        }
-    }
-}
-
-private fun Context.findActivity(): Activity? {
-    var context = this
-    while (context is ContextWrapper) {
-        if (context is Activity) return context
-        context = context.baseContext
-    }
-    return null
 }

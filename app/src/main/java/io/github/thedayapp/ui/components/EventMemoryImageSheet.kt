@@ -252,7 +252,9 @@ fun EventMemoryImageSheet(
                     currentBitmap.width.toFloat() /
                         currentBitmap.height.toFloat()
                 } else {
-                    3f / 4f
+                    EventMemoryImageRenderer.previewAspectRatio(
+                        event.backgroundImage,
+                    )
                 }
 
             val previewWidth = minOf(

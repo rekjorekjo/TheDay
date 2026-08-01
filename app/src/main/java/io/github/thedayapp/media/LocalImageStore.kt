@@ -29,17 +29,38 @@ class LocalImageStore(context: Context) {
 
     companion object {
         private const val TAG = "TheDayImageStore"
-        private const val MAX_LONG_EDGE = 2048
+        private const val MAX_CROPPED_LONG_EDGE = 3072
+        private const val MAX_ORIGINAL_LONG_EDGE = 4096
         private const val WEBP_QUALITY = 88
     }
 
     suspend fun importImage(uri: Uri): Result<StoredImageFile> {
+        return importImage(
+            uri = uri,
+            maxLongEdge = MAX_CROPPED_LONG_EDGE,
+        )
+    }
+
+    suspend fun importOriginalImage(uri: Uri): Result<StoredImageFile> {
+        return importImage(
+            uri = uri,
+            maxLongEdge = MAX_ORIGINAL_LONG_EDGE,
+        )
+    }
+
+    private suspend fun importImage(
+        uri: Uri,
+        maxLongEdge: Int,
+    ): Result<StoredImageFile> {
         var importedFileName: String? = null
 
         return try {
             withContext(Dispatchers.IO) {
                 try {
-                    val storedImage = doImportImage(uri)
+                    val storedImage = doImportImage(
+                        uri = uri,
+                        maxLongEdge = maxLongEdge,
+                    )
 
                     importedFileName = storedImage.fileName
 
@@ -73,7 +94,10 @@ class LocalImageStore(context: Context) {
         }
     }
 
-    private fun doImportImage(uri: Uri): StoredImageFile {
+    private fun doImportImage(
+        uri: Uri,
+        maxLongEdge: Int,
+    ): StoredImageFile {
         ensureDirectoryExists()
 
         var sourceTempFile: File? = null
@@ -111,7 +135,11 @@ class LocalImageStore(context: Context) {
             }
 
             // Calculate sample size
-            val inSampleSize = calculateInSampleSize(originalWidth, originalHeight, MAX_LONG_EDGE)
+            val inSampleSize = calculateInSampleSize(
+                width = originalWidth,
+                height = originalHeight,
+                maxLongEdge = maxLongEdge,
+            )
 
             // Decode bitmap from temporary source file
             bitmap = decodeBitmap(sourceTempFile, inSampleSize)
@@ -128,7 +156,10 @@ class LocalImageStore(context: Context) {
             }
 
             // Scale if needed (may return same or new bitmap)
-            val scaledBitmap = scaleIfNeeded(bitmap)
+            val scaledBitmap = scaleIfNeeded(
+                bitmap = bitmap,
+                maxLongEdge = maxLongEdge,
+            )
             if (scaledBitmap !== bitmap) {
                 bitmap.recycle()
                 bitmap = scaledBitmap
@@ -136,25 +167,27 @@ class LocalImageStore(context: Context) {
 
             // Generate file name
             val fileName = "${UUID.randomUUID()}.webp"
-            finalFile = File(imageDirectory, fileName)
-            tempFile = File(imageDirectory, ".$fileName.tmp")
+            val outputFile = File(imageDirectory, fileName)
+            val temporaryOutputFile = File(imageDirectory, ".$fileName.tmp")
+            finalFile = outputFile
+            tempFile = temporaryOutputFile
 
             // Write to temp file
-            writeWebP(bitmap, tempFile)
+            writeWebP(bitmap, temporaryOutputFile)
 
             // Move to final location
-            if (!tempFile.renameTo(finalFile)) {
-                tempFile.copyTo(finalFile, overwrite = true)
-                tempFile.delete()
+            if (!temporaryOutputFile.renameTo(outputFile)) {
+                temporaryOutputFile.copyTo(outputFile, overwrite = true)
+                temporaryOutputFile.delete()
             }
 
             // Verify
-            if (!finalFile.exists() || finalFile.length() == 0L) {
+            if (!outputFile.exists() || outputFile.length() == 0L) {
                 throw IOException("Failed to write final file")
             }
 
             val result = StoredImageFile(
-                fileName = finalFile.name,
+                fileName = outputFile.name,
                 width = bitmap.width,
                 height = bitmap.height,
             )
@@ -319,13 +352,16 @@ class LocalImageStore(context: Context) {
         )
     }
 
-    private fun scaleIfNeeded(bitmap: Bitmap): Bitmap {
+    private fun scaleIfNeeded(
+        bitmap: Bitmap,
+        maxLongEdge: Int,
+    ): Bitmap {
         val longEdge = maxOf(bitmap.width, bitmap.height)
-        if (longEdge <= MAX_LONG_EDGE) {
+        if (longEdge <= maxLongEdge) {
             return bitmap
         }
 
-        val scale = MAX_LONG_EDGE.toFloat() / longEdge
+        val scale = maxLongEdge.toFloat() / longEdge
         val newWidth = maxOf(1, (bitmap.width * scale).roundToInt())
         val newHeight = maxOf(1, (bitmap.height * scale).roundToInt())
 

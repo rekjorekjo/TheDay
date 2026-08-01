@@ -1,8 +1,8 @@
-# 开源许可与第三方组件
+开源许可与第三方组件
 
 The Day 使用了以下开源软件和第三方组件。
 
-## The Day
+一、The Day
 
 - 作者：rekjorekjo
 - 许可证：Apache License 2.0
@@ -22,7 +22,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-## AndroidX 与 Jetpack Compose
+二、AndroidX 与 Jetpack Compose
 
 The Day 使用 Google 提供的 AndroidX 和 Jetpack Compose 库构建用户界面。
 
@@ -36,7 +36,7 @@ The Day 使用 Google 提供的 AndroidX 和 Jetpack Compose 库构建用户界�
 - Lifecycle：生命周期感知组件
 - ViewModel：数据管理和界面状态保存
 
-## uCrop
+三、uCrop
 
 The Day 使用 Yalantis 的 uCrop 在设备本地裁剪用户选择的图片。
 
@@ -50,7 +50,7 @@ Copyright 2017, Yalantis
 
 uCrop 按 Apache License 2.0 提供。uCrop 在设备本地处理图片；使用该组件不代表 Yalantis 对 The Day 的认可或背书。
 
-## Bloom for Typora
+四、Bloom for Typora
 
 The Day 的 Bloom 系列主题配色参考并重新映射自 Bloom for Typora。
 
@@ -60,7 +60,7 @@ The Day 的 Bloom 系列主题配色参考并重新映射自 Bloom for Typora。
 
 The Day 使用 Bloom 的色彩家族作为设计参考，并将其重新映射为 Android Material 3 的颜色角色；并未复制 Typora 的排版、字体或界面代码。
 
-### MIT License
+MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -82,7 +82,7 @@ SOFTWARE.
 
 ---
 
-## 说明
+说明
 
 - uCrop 不代表 Yalantis 对 The Day 的认可或背书
 - Bloom 系列不代表原作者对 The Day 的认可或背书

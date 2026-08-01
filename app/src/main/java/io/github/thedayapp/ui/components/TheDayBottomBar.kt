@@ -18,10 +18,10 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
 enum class TheDayTab {
     DAYS,
     CATEGORIES,
-    NEW,
+    EXPORT,
     SETTINGS,
 }
 
@@ -49,7 +49,7 @@ fun TheDayBottomBar(
     selectedTab: TheDayTab,
     onDaysClick: () -> Unit,
     onCategoriesClick: () -> Unit,
-    onNewClick: () -> Unit,
+    onExportClick: () -> Unit,
     onSettingsClick: () -> Unit,
 ) {
     Surface(
@@ -103,11 +103,11 @@ fun TheDayBottomBar(
                 TheDayNavigationItem(
                     selected =
                         selectedTab ==
-                            TheDayTab.NEW,
-                    onClick = onNewClick,
+                            TheDayTab.EXPORT,
+                    onClick = onExportClick,
                     icon =
-                        Icons.Rounded.AddCircle,
-                    label = "新建",
+                        Icons.Rounded.IosShare,
+                    label = "导出",
                 )
 
                 TheDayNavigationItem(

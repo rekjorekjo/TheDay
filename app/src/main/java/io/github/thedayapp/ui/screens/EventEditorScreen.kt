@@ -64,12 +64,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import io.github.thedayapp.R
 import io.github.thedayapp.data.DayEvent
 import io.github.thedayapp.data.LocalImageReference
 import io.github.thedayapp.data.NewEventDraft
 import io.github.thedayapp.data.RepeatMode
-import io.github.thedayapp.ui.media.ImageFocusDialog
-import io.github.thedayapp.ui.media.ImageFocusPreviewMode
+import io.github.thedayapp.ui.media.deleteTemporaryPickerImage
+import io.github.thedayapp.ui.media.rememberImageRecropLauncher
 import io.github.thedayapp.ui.media.rememberSingleImagePickerLauncher
 import io.github.thedayapp.util.DateFormatting
 import kotlinx.coroutines.CancellationException
@@ -100,8 +101,9 @@ fun EventEditorScreen(
     onDraftSave: (NewEventDraft) -> Unit = {},
     onDraftClear: () -> Unit = {},
     initialBackgroundImage: LocalImageReference? = null,
-    onImportBackgroundImage: (suspend (Uri) -> Result<LocalImageReference>)? = null,
-    onReleaseBackgroundImage: (String?) -> Unit = {},
+    onImportBackgroundImage: (suspend (Uri, Uri) -> Result<LocalImageReference>)? = null,
+    onRecropBackgroundImage: (suspend (LocalImageReference, Uri) -> Result<LocalImageReference>)? = null,
+    onReleaseBackgroundImage: (LocalImageReference?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val locale = Locale.getDefault()
@@ -153,12 +155,11 @@ fun EventEditorScreen(
     var showDiscardDraftDialog by remember { mutableStateOf(false) }
     var isImportingBackground by remember { mutableStateOf(false) }
     var backgroundMenuExpanded by remember { mutableStateOf(false) }
-    var showBackgroundFocusDialog by remember { mutableStateOf(false) }
 
-    val currentBackgroundFileName = backgroundImage?.fileName
-    DisposableEffect(currentBackgroundFileName) {
+    DisposableEffect(backgroundImage) {
+        val imageToRelease = backgroundImage
         onDispose {
-            onReleaseBackgroundImage(currentBackgroundFileName)
+            onReleaseBackgroundImage(imageToRelease)
         }
     }
 
@@ -218,39 +219,108 @@ fun EventEditorScreen(
         )
     }
 
-    val launchBackgroundPicker = rememberSingleImagePickerLauncher { uri ->
-        val importer = onImportBackgroundImage
-            ?: return@rememberSingleImagePickerLauncher
+    val launchBackgroundPicker = rememberSingleImagePickerLauncher(
+        onImagePicked = { selection ->
+            val importer = onImportBackgroundImage
 
-        if (isImportingBackground) {
-            return@rememberSingleImagePickerLauncher
-        }
-
-        coroutineScope.launch {
-            isImportingBackground = true
-
-            try {
-                val result = try {
-                    importer(uri)
-                } catch (exception: CancellationException) {
-                    throw exception
-                } catch (exception: Exception) {
-                    Result.failure(exception)
-                }
-
-                result.onSuccess { imported ->
-                    backgroundImage = imported
-                    persistDraft(newBackgroundImage = imported)
-                }.onFailure {
-                    snackbarHostState.showSnackbar(
-                        message = "图片导入失败，请重试",
-                    )
-                }
-            } finally {
-                isImportingBackground = false
+            if (importer == null || isImportingBackground) {
+                deleteTemporaryPickerImage(context, selection.originalUri)
+                deleteTemporaryPickerImage(context, selection.croppedUri)
+                return@rememberSingleImagePickerLauncher
             }
-        }
-    }
+
+            coroutineScope.launch {
+                isImportingBackground = true
+
+                try {
+                    val result = try {
+                        importer(
+                            selection.originalUri,
+                            selection.croppedUri,
+                        )
+                    } catch (exception: CancellationException) {
+                        throw exception
+                    } catch (exception: Exception) {
+                        Result.failure(exception)
+                    }
+
+                    result.onSuccess { imported ->
+                        backgroundImage = imported
+                        persistDraft(newBackgroundImage = imported)
+                    }.onFailure {
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(
+                                R.string.image_import_failed,
+                            ),
+                        )
+                    }
+                } finally {
+                    deleteTemporaryPickerImage(context, selection.originalUri)
+                    deleteTemporaryPickerImage(context, selection.croppedUri)
+                    isImportingBackground = false
+                }
+            }
+        },
+        onCropFailed = {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(
+                    message = context.getString(
+                        R.string.image_crop_failed,
+                    ),
+                )
+            }
+        },
+    )
+
+    val launchBackgroundRecrop = rememberImageRecropLauncher(
+        image = backgroundImage,
+        onImageCropped = { croppedUri ->
+            val image = backgroundImage
+            val recropper = onRecropBackgroundImage
+
+            if (image == null || recropper == null || isImportingBackground) {
+                deleteTemporaryPickerImage(context, croppedUri)
+                return@rememberImageRecropLauncher
+            }
+
+            coroutineScope.launch {
+                isImportingBackground = true
+
+                try {
+                    val result = try {
+                        recropper(image, croppedUri)
+                    } catch (exception: CancellationException) {
+                        throw exception
+                    } catch (exception: Exception) {
+                        Result.failure(exception)
+                    }
+
+                    result.onSuccess { recropped ->
+                        backgroundImage = recropped
+                        persistDraft(newBackgroundImage = recropped)
+                    }.onFailure {
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(
+                                R.string.image_crop_failed,
+                            ),
+                        )
+                    }
+                } finally {
+                    deleteTemporaryPickerImage(context, croppedUri)
+                    isImportingBackground = false
+                }
+            }
+        },
+        onCropFailed = {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(
+                    message = context.getString(
+                        R.string.image_crop_failed,
+                    ),
+                )
+            }
+        },
+    )
 
     fun saveEvent() {
         val event = DayEvent(
@@ -448,10 +518,10 @@ fun EventEditorScreen(
                                         onDismissRequest = { backgroundMenuExpanded = false },
                                     ) {
                                         DropdownMenuItem(
-                                            text = { Text("调整位置") },
+                                            text = { Text("重新裁剪") },
                                             onClick = {
                                                 backgroundMenuExpanded = false
-                                                showBackgroundFocusDialog = true
+                                                launchBackgroundRecrop()
                                             },
                                         )
                                         DropdownMenuItem(
@@ -653,19 +723,6 @@ fun EventEditorScreen(
         )
     }
 
-    val imageForFocus = backgroundImage
-    if (showBackgroundFocusDialog && imageForFocus != null) {
-        ImageFocusDialog(
-            image = imageForFocus,
-            mode = ImageFocusPreviewMode.EVENT_BACKGROUND,
-            onDismiss = { showBackgroundFocusDialog = false },
-            onConfirm = { adjustedImage ->
-                backgroundImage = adjustedImage
-                persistDraft(newBackgroundImage = adjustedImage)
-                showBackgroundFocusDialog = false
-            },
-        )
-    }
 }
 
 @Composable

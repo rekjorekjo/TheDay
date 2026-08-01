@@ -1,35 +1,43 @@
 package io.github.thedayapp.ui.screens
 
+import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Label
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Notes
-import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.VerticalAlignTop
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -44,6 +52,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,21 +66,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.thedayapp.WidgetPinActivity
 import io.github.thedayapp.data.DayEvent
+import io.github.thedayapp.data.ImagePlacementTarget
+import io.github.thedayapp.data.ImageTransform
+import io.github.thedayapp.device.HyperOsCompatibility
 import io.github.thedayapp.data.RepeatMode
 import io.github.thedayapp.domain.DayMath
 import io.github.thedayapp.sharing.MemoryImagePalette
 import io.github.thedayapp.ui.components.EventMemoryImageSheet
-import io.github.thedayapp.ui.media.localImageAlignment
+import io.github.thedayapp.ui.media.EventImageCardType
+import io.github.thedayapp.ui.media.adaptiveEventImageMinimumHeight
+import io.github.thedayapp.ui.media.TransformableLocalImageViewport
 import io.github.thedayapp.ui.media.rememberLocalImageBitmap
 import io.github.thedayapp.util.DateFormatting
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.Locale
@@ -86,6 +101,8 @@ fun EventDetailScreen(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onTogglePinned: () -> Unit,
+    onAdjustImage: () -> Unit,
+    onImageTransformChange: (ImageTransform) -> Unit,
 ) {
     val context = LocalContext.current
     val locale = Locale.getDefault()
@@ -93,9 +110,13 @@ fun EventDetailScreen(
     val displayDate = DayMath.effectiveDate(event, today)
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val hideWidgetQuickAdd = remember(context) {
+        HyperOsCompatibility.shouldHideWidgetQuickAdd(context)
+    }
 
     var confirmDelete by remember { mutableStateOf(false) }
     var showMemoryImageSheet by remember { mutableStateOf(false) }
+    var showDetailsMenu by remember { mutableStateOf(false) }
 
     val imageReference = event.backgroundImage
     val imageBitmap = rememberLocalImageBitmap(
@@ -103,6 +124,28 @@ fun EventDetailScreen(
         maxDecodeLongEdgePx = 1280,
     )
     val hasBackgroundImage = imageReference != null && imageBitmap != null
+    val persistedTransform = imageReference?.transformFor(
+        ImagePlacementTarget.DETAIL,
+    ) ?: ImageTransform()
+    var liveTransform by remember(
+        event.id,
+        imageReference?.fileName,
+    ) {
+        mutableStateOf(persistedTransform)
+    }
+
+    LaunchedEffect(persistedTransform) {
+        if (liveTransform != persistedTransform) {
+            liveTransform = persistedTransform
+        }
+    }
+
+    LaunchedEffect(liveTransform, persistedTransform) {
+        if (liveTransform != persistedTransform) {
+            delay(320)
+            onImageTransformChange(liveTransform)
+        }
+    }
 
     val colorScheme = MaterialTheme.colorScheme
     val memoryImagePalette = remember(colorScheme) {
@@ -128,7 +171,7 @@ fun EventDetailScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
-                title = { Text("日子详情") },
+                title = { Text("日子") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Rounded.ArrowBack, contentDescription = "返回")
@@ -144,6 +187,26 @@ fun EventDetailScreen(
                     }
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Rounded.Edit, contentDescription = "编辑")
+                    }
+                    Box {
+                        IconButton(
+                            onClick = {
+                                showDetailsMenu = true
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreHoriz,
+                                contentDescription = "详细信息",
+                            )
+                        }
+                        EventDetailsMenu(
+                            expanded = showDetailsMenu,
+                            event = event,
+                            locale = locale,
+                            onDismissRequest = {
+                                showDetailsMenu = false
+                            },
+                        )
                     }
                 },
             )
@@ -162,103 +225,114 @@ fun EventDetailScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                 ),
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clipToBounds(),
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    if (hasBackgroundImage && imageBitmap != null) {
-                        androidx.compose.foundation.Image(
-                            bitmap = imageBitmap,
-                            contentDescription = null,
-                            modifier = Modifier.matchParentSize(),
-                            contentScale = ContentScale.Crop,
-                            alignment = localImageAlignment(imageReference!!),
-                        )
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color.Black.copy(alpha = 0.18f),
-                                            Color.Black.copy(alpha = 0.38f),
-                                            Color.Black.copy(alpha = 0.66f),
-                                        ),
-                                    ),
-                                ),
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(
-                                            MaterialTheme.colorScheme.primaryContainer,
-                                            MaterialTheme.colorScheme.surfaceVariant,
-                                        ),
-                                    ),
-                                ),
-                        )
-                    }
+                    val adaptiveMinimumHeight = adaptiveEventImageMinimumHeight(
+                        availableWidth = maxWidth,
+                        image = imageReference,
+                        type = EventImageCardType.DETAIL,
+                    )
 
-                    Column(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 30.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = event.title,
-                                modifier = Modifier.weight(
-                                    weight = 1f,
-                                    fill = false,
-                                ),
-                                style = MaterialTheme.typography.headlineMedium,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = if (hasBackgroundImage) {
-                                    Color.White
+                            .then(
+                                if (adaptiveMinimumHeight != null) {
+                                    Modifier.heightIn(min = adaptiveMinimumHeight)
                                 } else {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                    Modifier
                                 },
                             )
-                            if (delta != 0L) {
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    text = if (delta > 0L) "还有" else "已经",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = if (hasBackgroundImage) {
-                                        Color.White.copy(alpha = 0.84f)
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        if (delta == 0L) {
-                            Text(
-                                text = "今天",
-                                style = MaterialTheme.typography.displayLarge,
-                                color = if (hasBackgroundImage) {
-                                    Color.White
-                                } else {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
+                            .clipToBounds(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (hasBackgroundImage && imageBitmap != null) {
+                            TransformableLocalImageViewport(
+                                bitmap = imageBitmap,
+                                transform = liveTransform,
+                                onTransformChange = { updated ->
+                                    liveTransform = updated
                                 },
+                                modifier = Modifier.matchParentSize(),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(
+                                                Color.Black.copy(alpha = 0.18f),
+                                                Color.Black.copy(alpha = 0.38f),
+                                                Color.Black.copy(alpha = 0.66f),
+                                            ),
+                                        ),
+                                    ),
                             )
                         } else {
-                            Row(verticalAlignment = Alignment.Bottom) {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                MaterialTheme.colorScheme.primaryContainer,
+                                                MaterialTheme.colorScheme.surfaceVariant,
+                                            ),
+                                        ),
+                                    ),
+                            )
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 30.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        horizontal = if (hasBackgroundImage) 42.dp else 0.dp,
+                                    ),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 Text(
-                                    text = abs(delta).toString(),
+                                    text = event.title,
+                                    modifier = Modifier.weight(
+                                        weight = 1f,
+                                        fill = false,
+                                    ),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = if (hasBackgroundImage) {
+                                        Color.White
+                                    } else {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    },
+                                )
+                                if (delta != 0L) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = if (delta > 0L) "还有" else "已经",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = if (hasBackgroundImage) {
+                                            Color.White.copy(alpha = 0.84f)
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(24.dp))
+                            if (delta == 0L) {
+                                Text(
+                                    text = "今天",
                                     style = MaterialTheme.typography.displayLarge,
                                     color = if (hasBackgroundImage) {
                                         Color.White
@@ -266,68 +340,67 @@ fun EventDetailScreen(
                                         MaterialTheme.colorScheme.onPrimaryContainer
                                     },
                                 )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    text = "天",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = if (hasBackgroundImage) {
-                                        Color.White.copy(alpha = 0.84f)
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    modifier = Modifier.padding(bottom = 8.dp),
+                            } else {
+                                Row(verticalAlignment = Alignment.Bottom) {
+                                    Text(
+                                        text = abs(delta).toString(),
+                                        style = MaterialTheme.typography.displayLarge,
+                                        color = if (hasBackgroundImage) {
+                                            Color.White
+                                        } else {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        },
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "天",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = if (hasBackgroundImage) {
+                                            Color.White.copy(alpha = 0.84f)
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        modifier = Modifier.padding(bottom = 8.dp),
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(18.dp))
+                            Text(
+                                text = "${DateFormatting.longDate(displayDate, locale)} · " +
+                                    DateFormatting.weekday(displayDate, locale),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (hasBackgroundImage) {
+                                    Color.White.copy(alpha = 0.84f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+
+                        if (hasBackgroundImage) {
+                            IconButton(
+                                onClick = onAdjustImage,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(10.dp)
+                                    .size(40.dp)
+                                    .background(
+                                        color = Color.Black.copy(alpha = 0.32f),
+                                        shape = CircleShape,
+                                    ),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.TouchApp,
+                                    contentDescription = "调整详情图片",
+                                    tint = Color.White,
                                 )
                             }
                         }
-                        Spacer(Modifier.height(18.dp))
-                        Text(
-                            text = "${DateFormatting.longDate(displayDate, locale)} · " +
-                                DateFormatting.weekday(displayDate, locale),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (hasBackgroundImage) {
-                                Color.White.copy(alpha = 0.84f)
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            textAlign = TextAlign.Center,
-                        )
                     }
                 }
             }
 
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
-                    DetailRow(
-                        icon = Icons.Rounded.CalendarMonth,
-                        label = "原始日期",
-                        value = DateFormatting.longDate(event.date, locale),
-                    )
-                    HorizontalDivider()
-                    DetailRow(
-                        icon = Icons.Rounded.Repeat,
-                        label = "重复",
-                        value = if (event.repeatMode == RepeatMode.YEARLY) "每年" else "不重复",
-                    )
-                    if (event.category.isNotBlank()) {
-                        HorizontalDivider()
-                        DetailRow(
-                            icon = Icons.Rounded.Label,
-                            label = "分类",
-                            value = event.category,
-                        )
-                    }
-                    HorizontalDivider()
-                    DetailRow(
-                        icon = Icons.Rounded.Notifications,
-                        label = "提醒",
-                        value = reminderText(event.reminderDaysBefore),
-                    )
-                }
-            }
 
             if (event.note.isNotBlank()) {
                 Card(
@@ -378,6 +451,27 @@ fun EventDetailScreen(
                     },
                     modifier = Modifier.weight(1f),
                 )
+                if (!hideWidgetQuickAdd) {
+                    DetailActionButton(
+                        text = "添加小组件",
+                        icon = Icons.Rounded.Widgets,
+                        actionDescription = "为这个日子添加桌面小组件",
+                        onClick = {
+                            context.startActivity(
+                                Intent(
+                                    context,
+                                    WidgetPinActivity::class.java,
+                                ).apply {
+                                    putExtra(
+                                        WidgetPinActivity.EXTRA_EVENT_ID,
+                                        event.id,
+                                    )
+                                },
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -420,6 +514,63 @@ fun EventDetailScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun EventDetailsMenu(
+    expanded: Boolean,
+    event: DayEvent,
+    locale: Locale,
+    onDismissRequest: () -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        modifier = Modifier.widthIn(
+            min = 270.dp,
+            max = 340.dp,
+        ),
+    ) {
+        Text(
+            text = "详细信息",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(
+                start = 16.dp,
+                end = 16.dp,
+                top = 8.dp,
+                bottom = 4.dp,
+            ),
+        )
+        DetailRow(
+            icon = Icons.Rounded.CalendarMonth,
+            label = "日期",
+            value = DateFormatting.longDate(event.date, locale),
+        )
+        HorizontalDivider()
+        DetailRow(
+            icon = Icons.Rounded.Repeat,
+            label = "重复",
+            value = if (event.repeatMode == RepeatMode.YEARLY) {
+                "每年"
+            } else {
+                "不重复"
+            },
+        )
+        HorizontalDivider()
+        DetailRow(
+            icon = Icons.Rounded.Notifications,
+            label = "提醒",
+            value = reminderText(event.reminderDaysBefore),
+        )
+        if (event.category.isNotBlank()) {
+            HorizontalDivider()
+            DetailRow(
+                icon = Icons.Rounded.Label,
+                label = "分类",
+                value = event.category,
+            )
+        }
     }
 }
 

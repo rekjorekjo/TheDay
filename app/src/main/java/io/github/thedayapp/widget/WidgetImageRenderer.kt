@@ -11,6 +11,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.util.Log
+import io.github.thedayapp.data.ImagePlacementTarget
 import io.github.thedayapp.data.LocalImageReference
 import io.github.thedayapp.media.LocalImageStore
 import kotlin.math.max
@@ -73,8 +74,9 @@ internal object WidgetImageRenderer {
             decodedBitmap = BitmapFactory.decodeFile(file.absolutePath, options)
             if (decodedBitmap == null) return null
 
-            val focusX = if (image.focusX.isFinite()) image.focusX.coerceIn(0f, 1f) else 0.5f
-            val focusY = if (image.focusY.isFinite()) image.focusY.coerceIn(0f, 1f) else 0.5f
+            val transform = image.transformFor(ImagePlacementTarget.HOME)
+            val focusX = transform.focusX
+            val focusY = transform.focusY
 
             outputBitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(outputBitmap)
@@ -95,28 +97,30 @@ internal object WidgetImageRenderer {
             val targetAspectRatio = targetWidth.toFloat() / targetHeight
             val sourceAspectRatio = decodedBitmap.width.toFloat() / decodedBitmap.height
 
-            val cropRect: RectF
+            val baseCropWidth: Float
+            val baseCropHeight: Float
             if (sourceAspectRatio > targetAspectRatio) {
-                val cropHeight = decodedBitmap.height.toFloat()
-                val cropWidth = cropHeight * targetAspectRatio
-                val left = (decodedBitmap.width - cropWidth) * focusX
-                cropRect = RectF(
-                    left.coerceIn(0f, decodedBitmap.width - cropWidth),
-                    0f,
-                    left.coerceIn(0f, decodedBitmap.width - cropWidth) + cropWidth,
-                    cropHeight,
-                )
+                baseCropHeight = decodedBitmap.height.toFloat()
+                baseCropWidth = baseCropHeight * targetAspectRatio
             } else {
-                val cropWidth = decodedBitmap.width.toFloat()
-                val cropHeight = cropWidth / targetAspectRatio
-                val top = (decodedBitmap.height - cropHeight) * focusY
-                cropRect = RectF(
-                    0f,
-                    top.coerceIn(0f, decodedBitmap.height - cropHeight),
-                    cropWidth,
-                    top.coerceIn(0f, decodedBitmap.height - cropHeight) + cropHeight,
-                )
+                baseCropWidth = decodedBitmap.width.toFloat()
+                baseCropHeight = baseCropWidth / targetAspectRatio
             }
+
+            val cropWidth = (baseCropWidth / transform.zoom)
+                .coerceIn(1f, decodedBitmap.width.toFloat())
+            val cropHeight = (baseCropHeight / transform.zoom)
+                .coerceIn(1f, decodedBitmap.height.toFloat())
+            val maxLeft = (decodedBitmap.width - cropWidth).coerceAtLeast(0f)
+            val maxTop = (decodedBitmap.height - cropHeight).coerceAtLeast(0f)
+            val left = maxLeft * focusX
+            val top = maxTop * focusY
+            val cropRect = RectF(
+                left,
+                top,
+                left + cropWidth,
+                top + cropHeight,
+            )
 
             val paint = Paint(
                 Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG,

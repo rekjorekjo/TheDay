@@ -13,7 +13,6 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import io.github.thedayapp.R
-import io.github.thedayapp.data.DayEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -32,45 +31,7 @@ object EventShareActions {
     ): Result<Unit> {
         return try {
             val sharedFile = withContext(Dispatchers.IO) {
-                val directory = File(
-                    context.cacheDir,
-                    SHARED_IMAGE_DIRECTORY,
-                )
-
-                if (!directory.exists() && !directory.mkdirs()) {
-                    throw IOException("Failed to create shared image directory")
-                }
-
-                if (!directory.isDirectory) {
-                    throw IOException("Shared image path is not a directory")
-                }
-
-                val expiry = System.currentTimeMillis() - SHARED_IMAGE_MAX_AGE_MILLIS
-                directory.listFiles()?.forEach { file ->
-                    if (file.isFile && file.lastModified() < expiry) {
-                        file.delete()
-                    }
-                }
-
-                val outputFile = File(
-                    directory,
-                    "the-day-share-${System.currentTimeMillis()}.png",
-                )
-
-                outputFile.outputStream()
-                    .buffered()
-                    .use { output ->
-                        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
-                            throw IOException("Failed to encode shared image")
-                        }
-                        output.flush()
-                    }
-
-                if (!outputFile.exists() || outputFile.length() <= 0L) {
-                    throw IOException("Shared image is empty")
-                }
-
-                outputFile
+                createSharedImageFile(context, bitmap)
             }
 
             val contentUri = FileProvider.getUriForFile(
@@ -96,6 +57,78 @@ object EventShareActions {
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     },
                 )
+            }
+
+            Result.success(Unit)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            Result.failure(exception)
+        }
+    }
+
+    suspend fun shareImages(
+        context: Context,
+        bitmaps: List<Bitmap>,
+    ): Result<Unit> {
+        return try {
+            if (bitmaps.isEmpty()) {
+                throw IOException("No images to share")
+            }
+
+            val sharedFiles = withContext(Dispatchers.IO) {
+                bitmaps.map { bitmap ->
+                    createSharedImageFile(context, bitmap)
+                }
+            }
+
+            val contentUris = ArrayList<Uri>(sharedFiles.size)
+            sharedFiles.forEach { file ->
+                contentUris += FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                )
+            }
+
+            withContext(Dispatchers.Main) {
+                if (contentUris.size == 1) {
+                    val contentUri = contentUris.first()
+                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "image/png"
+                        putExtra(Intent.EXTRA_STREAM, contentUri)
+                        clipData = ClipData.newRawUri("The Day", contentUri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    launchChooser(
+                        context = context,
+                        chooser = Intent.createChooser(
+                            sendIntent,
+                            context.getString(R.string.share_memory_image_chooser),
+                        ).apply {
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        },
+                    )
+                } else {
+                    val sendIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                        type = "image/png"
+                        putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(contentUris))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        clipData = ClipData.newUri(context.contentResolver, "The Day", contentUris.first())
+                        contentUris.drop(1).forEach { uri ->
+                            clipData?.addItem(ClipData.Item(uri))
+                        }
+                    }
+                    launchChooser(
+                        context = context,
+                        chooser = Intent.createChooser(
+                            sendIntent,
+                            context.getString(R.string.share_memory_image_chooser),
+                        ).apply {
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        },
+                    )
+                }
             }
 
             Result.success(Unit)
@@ -234,6 +267,51 @@ object EventShareActions {
             outputFile.delete()
             throw exception
         }
+    }
+
+    private fun createSharedImageFile(
+        context: Context,
+        bitmap: Bitmap,
+    ): File {
+        val directory = File(
+            context.cacheDir,
+            SHARED_IMAGE_DIRECTORY,
+        )
+
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw IOException("Failed to create shared image directory")
+        }
+
+        if (!directory.isDirectory) {
+            throw IOException("Shared image path is not a directory")
+        }
+
+        val expiry = System.currentTimeMillis() - SHARED_IMAGE_MAX_AGE_MILLIS
+        directory.listFiles()?.forEach { file ->
+            if (file.isFile && file.lastModified() < expiry) {
+                file.delete()
+            }
+        }
+
+        val outputFile = File(
+            directory,
+            "the-day-share-${System.currentTimeMillis()}-${(0..9999).random()}.png",
+        )
+
+        outputFile.outputStream()
+            .buffered()
+            .use { output ->
+                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                    throw IOException("Failed to encode shared image")
+                }
+                output.flush()
+            }
+
+        if (!outputFile.exists() || outputFile.length() <= 0L) {
+            throw IOException("Shared image is empty")
+        }
+
+        return outputFile
     }
 
     private fun launchChooser(

@@ -183,6 +183,26 @@ class DayRepository(context: Context) {
             .put("height", image.height)
             .put("focusX", image.focusX)
             .put("focusY", image.focusY)
+            .put(
+                "originalFileName",
+                image.originalFileName ?: JSONObject.NULL,
+            )
+            .put(
+                "homeTransform",
+                imageTransformToJson(image.homeTransform),
+            )
+            .put(
+                "detailTransform",
+                imageTransformToJson(image.detailTransform),
+            )
+    }
+
+    private fun imageTransformToJson(transform: ImageTransform): JSONObject {
+        val safe = transform.normalized()
+        return JSONObject()
+            .put("focusX", safe.focusX)
+            .put("focusY", safe.focusY)
+            .put("zoom", safe.zoom)
     }
 
     private fun imageReferenceFromJson(json: JSONObject?): LocalImageReference? {
@@ -209,13 +229,64 @@ class DayRepository(context: Context) {
             ?.coerceIn(0f, 1f)
             ?: 0.5f
 
+        val originalFileName = json
+            .optString("originalFileName")
+            .takeIf { candidate ->
+                candidate.isNotEmpty() &&
+                    File(candidate).name == candidate &&
+                    candidate.endsWith(".webp")
+            }
+
+        val legacyTransform = ImageTransform(
+            focusX = focusX,
+            focusY = focusY,
+            zoom = 1f,
+        )
+        val homeTransform = imageTransformFromJson(
+            json.optJSONObject("homeTransform"),
+            fallback = legacyTransform,
+        )
+        val detailTransform = imageTransformFromJson(
+            json.optJSONObject("detailTransform"),
+            fallback = legacyTransform,
+        )
+
         return LocalImageReference(
             fileName = fileName,
             width = width,
             height = height,
             focusX = focusX,
             focusY = focusY,
+            originalFileName = originalFileName,
+            homeTransform = homeTransform,
+            detailTransform = detailTransform,
         )
+    }
+
+    private fun imageTransformFromJson(
+        json: JSONObject?,
+        fallback: ImageTransform,
+    ): ImageTransform {
+        if (json == null) return fallback.normalized()
+
+        val focusX = json.optDouble("focusX", fallback.focusX.toDouble())
+            .takeIf { it.isFinite() }
+            ?.toFloat()
+            ?: fallback.focusX
+        val focusY = json.optDouble("focusY", fallback.focusY.toDouble())
+            .takeIf { it.isFinite() }
+            ?.toFloat()
+            ?: fallback.focusY
+        val zoom = json.optDouble("zoom", fallback.zoom.toDouble())
+            .takeIf { it.isFinite() }
+            ?.toFloat()
+            ?: fallback.zoom
+
+        return ImageTransform(
+            focusX = focusX,
+            focusY = focusY,
+            zoom = zoom,
+        ).normalized()
     }
 
     fun loadCategoryCovers(): Map<String, LocalImageReference> {

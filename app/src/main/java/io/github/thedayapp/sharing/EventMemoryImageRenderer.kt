@@ -15,6 +15,7 @@ import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
 import io.github.thedayapp.data.DayEvent
+import io.github.thedayapp.data.ImagePlacementTarget
 import io.github.thedayapp.data.LocalImageReference
 import io.github.thedayapp.domain.DayMath
 import io.github.thedayapp.media.LocalImageStore
@@ -47,13 +48,59 @@ data class MemoryImagePalette(
 )
 
 object EventMemoryImageRenderer {
-    const val PORTRAIT_WIDTH = 1080
-    const val PORTRAIT_HEIGHT = 1440
-    const val LANDSCAPE_WIDTH = 1440
-    const val LANDSCAPE_HEIGHT = 1080
-
+    private const val OUTPUT_LONG_EDGE = 1440
+    private const val DEFAULT_OUTPUT_ASPECT_RATIO = 3f / 4f
     private const val SOURCE_IMAGE_MAX_LONG_EDGE = 2160
     private const val LANDSCAPE_ASPECT_RATIO_THRESHOLD = 1.15f
+    private const val TOP_RIGHT_DATE_MAX_WIDTH_FRACTION = 0.3f
+
+    private const val MEMORY_MAIN_MIN_ASPECT_RATIO = 0.60f
+    private const val MEMORY_MAIN_MAX_ASPECT_RATIO = 1.50f
+    private data class MemoryImageLayout(
+        val outputAspectRatio: Float,
+        val isLandscape: Boolean,
+    )
+
+    private data class OutputSize(
+        val width: Int,
+        val height: Int,
+    )
+
+    /**
+     * Ratio used by the bottom-sheet preview before the rendered bitmap is
+     * ready. The 0.6:1 and 1.5:1 limits now apply directly to the exported
+     * memorial image itself.
+     */
+    internal fun previewAspectRatio(
+        image: LocalImageReference?,
+    ): Float {
+        return memoryImageLayout(image).outputAspectRatio
+    }
+
+    private fun memoryImageLayout(
+        image: LocalImageReference?,
+    ): MemoryImageLayout {
+        val aspectRatio = image
+            ?.takeIf { reference ->
+                reference.width > 0 && reference.height > 0
+            }
+            ?.let { reference ->
+                reference.width.toFloat() / reference.height.toFloat()
+            }
+            ?.takeIf { ratio ->
+                ratio.isFinite() && ratio > 0f
+            }
+            ?.coerceIn(
+                MEMORY_MAIN_MIN_ASPECT_RATIO,
+                MEMORY_MAIN_MAX_ASPECT_RATIO,
+            )
+            ?: DEFAULT_OUTPUT_ASPECT_RATIO
+
+        return MemoryImageLayout(
+            outputAspectRatio = aspectRatio,
+            isLandscape = aspectRatio >= LANDSCAPE_ASPECT_RATIO_THRESHOLD,
+        )
+    }
 
     private data class DecorationPoint(
         val x: Float,
@@ -78,6 +125,13 @@ object EventMemoryImageRenderer {
         val variantFillMax: Int,
         val primaryStrokeMin: Int,
         val primaryStrokeMax: Int,
+    )
+
+
+    private data class DecorationDistribution(
+        val centerWeight: Int,
+        val outerWeight: Int,
+        val centerRegion: RectF,
     )
 
     private fun decorationAlphaProfile(isDark: Boolean): DecorationAlphaProfile {
@@ -145,14 +199,44 @@ object EventMemoryImageRenderer {
         return Color.argb(resultAlpha, resultRed, resultGreen, resultBlue)
     }
 
-    private fun randomCenterPoint(random: Random): DecorationPoint {
-        val x = 0.25f + random.nextFloat() * 0.5f
-        val y = 0.22f + random.nextFloat() * 0.56f
+    private fun decorationDistribution(
+        hasBackgroundImage: Boolean,
+    ): DecorationDistribution {
+        return if (hasBackgroundImage) {
+            DecorationDistribution(
+                centerWeight = 1,
+                outerWeight = 9,
+                centerRegion = RectF(0.3f, 0.28f, 0.7f, 0.72f),
+            )
+        } else {
+            DecorationDistribution(
+                centerWeight = 1,
+                outerWeight = 2,
+                centerRegion = RectF(0.25f, 0.22f, 0.75f, 0.78f),
+            )
+        }
+    }
+
+    private fun randomCenterPoint(
+        random: Random,
+        centerRegion: RectF,
+    ): DecorationPoint {
+
+        val x = centerRegion.left + random.nextFloat() * centerRegion.width()
+        val y = centerRegion.top + random.nextFloat() * centerRegion.height()
 
         val baseScale = 0.55f + random.nextFloat() * 0.3f
         val baseAlpha = 0.55f + random.nextFloat() * 0.23f
 
-        val (finalScale, finalAlpha) = if (x in 0.36f..0.64f && y in 0.38f..0.64f) {
+        val innerQuietLeft = centerRegion.left + centerRegion.width() * 0.22f
+        val innerQuietRight = centerRegion.right - centerRegion.width() * 0.22f
+        val innerQuietTop = centerRegion.top + centerRegion.height() * 0.28f
+        val innerQuietBottom = centerRegion.bottom - centerRegion.height() * 0.25f
+
+        val (finalScale, finalAlpha) = if (
+            x in innerQuietLeft..innerQuietRight &&
+            y in innerQuietTop..innerQuietBottom
+        ) {
             baseScale * 0.65f to baseAlpha * 0.6f
         } else {
             baseScale to baseAlpha
@@ -168,7 +252,10 @@ object EventMemoryImageRenderer {
         )
     }
 
-    private fun randomOuterPoint(random: Random): DecorationPoint {
+    private fun randomOuterPoint(
+        random: Random,
+        centerRegion: RectF,
+    ): DecorationPoint {
         var x: Float
         var y: Float
 
@@ -177,7 +264,7 @@ object EventMemoryImageRenderer {
             val candidateY = random.nextFloat()
             x = candidateX
             y = candidateY
-        } while (x in 0.25f..0.75f && y in 0.22f..0.78f)
+        } while (x in centerRegion.left..centerRegion.right && y in centerRegion.top..centerRegion.bottom)
 
         return DecorationPoint(
             x = x,
@@ -192,12 +279,25 @@ object EventMemoryImageRenderer {
     private fun generateDecorationPoints(
         random: Random,
         totalCount: Int,
+        hasBackgroundImage: Boolean,
     ): List<DecorationPoint> {
-        val centerCount = (totalCount * 0.2f).roundToInt().coerceAtLeast(1)
+        val distribution = decorationDistribution(hasBackgroundImage)
+        val totalWeight = distribution.centerWeight + distribution.outerWeight
+        val centerCount = if (totalCount <= 1) {
+            0
+        } else {
+            ((totalCount * distribution.centerWeight.toFloat()) / totalWeight)
+                .roundToInt()
+                .coerceIn(1, totalCount - 1)
+        }
         val outerCount = totalCount - centerCount
 
-        val centerPoints = List(centerCount) { randomCenterPoint(random) }
-        val outerPoints = List(outerCount) { randomOuterPoint(random) }
+        val centerPoints = List(centerCount) {
+            randomCenterPoint(random, distribution.centerRegion)
+        }
+        val outerPoints = List(outerCount) {
+            randomOuterPoint(random, distribution.centerRegion)
+        }
 
         return (centerPoints + outerPoints).shuffled(random)
     }
@@ -240,14 +340,21 @@ object EventMemoryImageRenderer {
                 LocalImageStore(context).fileFor(reference.fileName)
             }
 
-        val sourceAspectRatio = imageFile?.let { file ->
-            getImageAspectRatio(file)
+        val hasBackgroundImage =
+            imageFile?.isFile == true &&
+                imageReference != null
+
+        val memoryImageLayout = if (hasBackgroundImage) {
+            memoryImageLayout(checkNotNull(imageReference))
+        } else {
+            memoryImageLayout(null)
         }
+        val outputAspectRatio = memoryImageLayout.outputAspectRatio
 
-        val isLandscape = sourceAspectRatio != null && sourceAspectRatio >= LANDSCAPE_ASPECT_RATIO_THRESHOLD
-
-        val width = if (isLandscape) LANDSCAPE_WIDTH else PORTRAIT_WIDTH
-        val height = if (isLandscape) LANDSCAPE_HEIGHT else PORTRAIT_HEIGHT
+        val outputSize = memoryImageOutputSize(outputAspectRatio)
+        val width = outputSize.width
+        val height = outputSize.height
+        val isLandscape = memoryImageLayout.isLandscape
 
         val output = Bitmap.createBitmap(
             width,
@@ -258,7 +365,6 @@ object EventMemoryImageRenderer {
         var sourceBitmap: Bitmap? = null
 
         try {
-            val hasBackgroundImage = imageFile != null && imageReference != null
             val random = Random.Default
 
             if (hasBackgroundImage) {
@@ -266,97 +372,85 @@ object EventMemoryImageRenderer {
             }
 
             val baseSize = min(width, height).toFloat()
-            val outerInset = baseSize * 0.035f
-            val outerRadius = baseSize * 0.035f
-            val outerBorderWidth = baseSize * 0.0018f
-
-            val cardRect = RectF(
-                outerInset,
-                outerInset,
-                width - outerInset,
-                height - outerInset,
+            val canvasRect = RectF(
+                0f,
+                0f,
+                width.toFloat(),
+                height.toFloat(),
             )
-
+            val contentInsetX = width * if (isLandscape) 0.075f else 0.065f
+            val contentInsetTop = height * if (isLandscape) 0.105f else 0.085f
+            val contentInsetBottom = height * if (isLandscape) 0.07f else 0.06f
+            val cardRect = RectF(
+                contentInsetX,
+                contentInsetTop,
+                width - contentInsetX,
+                height - contentInsetBottom,
+            )
+            val cardRadius = min(cardRect.width(), cardRect.height()) * 0.055f
+            val cardBorderWidth = baseSize * 0.002f
             val cardPath = Path().apply {
                 addRoundRect(
                     cardRect,
-                    outerRadius,
-                    outerRadius,
+                    cardRadius,
+                    cardRadius,
                     Path.Direction.CW,
                 )
             }
-
-            val brandFraction = if (isLandscape) 0.09f else 0.072f
-            val sloganFraction = if (isLandscape) 0.112f else 0.088f
-
-            val brandBottom = cardRect.top + cardRect.height() * brandFraction
-            val sloganTop = cardRect.bottom - cardRect.height() * sloganFraction
-
-            val brandRect = RectF(
-                cardRect.left,
-                cardRect.top,
-                cardRect.right,
-                brandBottom,
+            val contentRect = RectF(
+                cardRect.left + cardRect.width() * 0.082f,
+                cardRect.top + cardRect.height() * 0.1f,
+                cardRect.right - cardRect.width() * 0.082f,
+                cardRect.bottom - cardRect.height() * 0.09f,
             )
 
-            val mainRect = RectF(
-                cardRect.left,
-                brandBottom,
-                cardRect.right,
-                sloganTop,
+            drawBackdrop(
+                canvas = canvas,
+                canvasRect = canvasRect,
+                palette = palette,
+                template = template,
+                hasBackgroundImage = hasBackgroundImage,
+                random = random,
             )
-
-            val sloganRect = RectF(
-                cardRect.left,
-                sloganTop,
-                cardRect.right,
-                cardRect.bottom,
+            drawCardShadowLayer(
+                canvas = canvas,
+                cardRect = cardRect,
+                cardRadius = cardRadius,
+                palette = palette,
+                baseSize = baseSize,
+            )
+            drawMiddleLayerText(
+                canvas = canvas,
+                canvasRect = canvasRect,
+                cardRect = cardRect,
+                palette = palette,
+                isLandscape = isLandscape,
+                today = today,
             )
 
             val cardSaveCount = canvas.save()
             canvas.clipPath(cardPath)
-
-            drawBaseRegions(
-                canvas = canvas,
-                brandRect = brandRect,
-                mainRect = mainRect,
-                sloganRect = sloganRect,
-                palette = palette,
-                hasBackgroundImage = hasBackgroundImage,
-                random = random,
-            )
-
-            drawTemplateDecoration(
+            drawCardSurface(
                 canvas = canvas,
                 cardRect = cardRect,
                 palette = palette,
-                template = template,
+                hasBackgroundImage = hasBackgroundImage,
             )
 
             if (sourceBitmap != null && imageReference != null) {
-                val imageSaveCount = canvas.save()
-                canvas.clipRect(mainRect)
-
                 drawFocusedCenterCrop(
                     canvas = canvas,
                     bitmap = sourceBitmap,
-                    destination = mainRect,
+                    destination = cardRect,
                     image = imageReference,
                 )
-
-                drawImageReadabilityOverlay(
-                    canvas = canvas,
-                    mainRect = mainRect,
-                )
-
-                canvas.restoreToCount(imageSaveCount)
             }
 
-            drawBrandText(
+            drawCardOverlay(
                 canvas = canvas,
-                brandRect = brandRect,
+                cardRect = cardRect,
                 palette = palette,
-                isLandscape = isLandscape,
+                hasBackgroundImage = hasBackgroundImage,
             )
 
             drawMainContent(
@@ -365,41 +459,24 @@ object EventMemoryImageRenderer {
                 today = today,
                 palette = palette,
                 hasBackgroundImage = hasBackgroundImage,
-                mainRect = mainRect,
+                mainRect = contentRect,
             )
-
-            drawSloganText(
-                canvas = canvas,
-                sloganRect = sloganRect,
-                palette = palette,
-                isLandscape = isLandscape,
-            )
-
-            drawInternalDividers(
-                canvas = canvas,
-                brandRect = brandRect,
-                sloganRect = sloganRect,
-                cardRect = cardRect,
-                baseSize = baseSize,
-                palette = palette,
-            )
-
             canvas.restoreToCount(cardSaveCount)
 
             val borderColor = if (palette.isDark) {
-                withAlpha(palette.primary, 108)
+                withAlpha(palette.primary, 112)
             } else {
-                withAlpha(palette.primary, 135)
+                withAlpha(palette.primary, 132)
             }
             val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = borderColor
                 style = Paint.Style.STROKE
-                strokeWidth = outerBorderWidth
+                strokeWidth = cardBorderWidth
             }
             canvas.drawRoundRect(
                 cardRect,
-                outerRadius,
-                outerRadius,
+                cardRadius,
+                cardRadius,
                 borderPaint,
             )
 
@@ -416,17 +493,348 @@ object EventMemoryImageRenderer {
         }
     }
 
-    private fun getImageAspectRatio(file: File): Float? {
-        val bounds = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
-        BitmapFactory.decodeFile(file.absolutePath, bounds)
+    private fun memoryImageOutputSize(
+        aspectRatio: Float,
+    ): OutputSize {
+        val safeAspectRatio = aspectRatio
+            .takeIf { it.isFinite() && it > 0f }
+            ?: DEFAULT_OUTPUT_ASPECT_RATIO
 
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-            return null
+        return if (safeAspectRatio >= 1f) {
+            OutputSize(
+                width = OUTPUT_LONG_EDGE,
+                height = (OUTPUT_LONG_EDGE / safeAspectRatio)
+                    .roundToInt()
+                    .coerceAtLeast(1),
+            )
+        } else {
+            OutputSize(
+                width = (OUTPUT_LONG_EDGE * safeAspectRatio)
+                    .roundToInt()
+                    .coerceAtLeast(1),
+                height = OUTPUT_LONG_EDGE,
+            )
+        }
+    }
+
+    private fun drawBackdrop(
+        canvas: Canvas,
+        canvasRect: RectF,
+        palette: MemoryImagePalette,
+        template: MemoryImageTemplate,
+        hasBackgroundImage: Boolean,
+        random: Random,
+    ) {
+        val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                canvasRect.left,
+                canvasRect.top,
+                canvasRect.right,
+                canvasRect.bottom,
+                intArrayOf(
+                    blendArgb(palette.background, palette.surface, if (palette.isDark) 0.16f else 0.1f),
+                    palette.background,
+                    blendArgb(palette.background, palette.primaryContainer, if (palette.isDark) 0.14f else 0.08f),
+                ),
+                floatArrayOf(0f, 0.52f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(canvasRect, backgroundPaint)
+
+        val glowRadius = min(canvasRect.width(), canvasRect.height())
+        val primaryGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = android.graphics.RadialGradient(
+                canvasRect.left + canvasRect.width() * 0.18f,
+                canvasRect.top + canvasRect.height() * 0.2f,
+                glowRadius * 0.42f,
+                withAlpha(palette.primary, if (palette.isDark) 48 else 34),
+                Color.TRANSPARENT,
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(canvasRect, primaryGlow)
+
+        val secondaryGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = android.graphics.RadialGradient(
+                canvasRect.right - canvasRect.width() * 0.16f,
+                canvasRect.bottom - canvasRect.height() * 0.18f,
+                glowRadius * 0.48f,
+                withAlpha(palette.primaryContainer, if (palette.isDark) 54 else 42),
+                Color.TRANSPARENT,
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(canvasRect, secondaryGlow)
+
+        drawTemplateDecoration(
+            canvas = canvas,
+            cardRect = canvasRect,
+            palette = palette,
+            template = template,
+            hasBackgroundImage = hasBackgroundImage,
+        )
+    }
+
+    private fun drawCardShadowLayer(
+        canvas: Canvas,
+        cardRect: RectF,
+        cardRadius: Float,
+        palette: MemoryImagePalette,
+        baseSize: Float,
+    ) {
+        val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = withAlpha(
+                if (palette.isDark) palette.surface else Color.WHITE,
+                if (palette.isDark) 38 else 120,
+            )
+            setShadowLayer(
+                baseSize * 0.05f,
+                0f,
+                baseSize * 0.018f,
+                withAlpha(Color.BLACK, if (palette.isDark) 118 else 64),
+            )
+        }
+        val shadowRect = RectF(cardRect)
+        canvas.drawRoundRect(shadowRect, cardRadius, cardRadius, shadowPaint)
+    }
+
+    private fun drawMiddleLayerText(
+        canvas: Canvas,
+        canvasRect: RectF,
+        cardRect: RectF,
+        palette: MemoryImagePalette,
+        isLandscape: Boolean,
+        today: LocalDate,
+    ) {
+        val baseSize = min(canvasRect.width(), canvasRect.height())
+        val topBand = RectF(
+            canvasRect.left,
+            canvasRect.top,
+            canvasRect.right,
+            cardRect.top,
+        )
+        val bottomBand = RectF(
+            canvasRect.left,
+            cardRect.bottom,
+            canvasRect.right,
+            canvasRect.bottom,
+        )
+
+        val brandColor = withAlpha(
+            palette.onSurface,
+            if (palette.isDark) 220 else 205,
+        )
+        val sloganColor = withAlpha(
+            palette.onSurfaceVariant,
+            if (palette.isDark) 185 else 170,
+        )
+
+        val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = brandColor
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = min(
+                baseSize * if (isLandscape) 0.027f else 0.032f,
+                topBand.height() * 0.34f,
+            )
+            letterSpacing = 0.08f
+        }
+        val sloganPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = sloganColor
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            textSize = min(
+                baseSize * if (isLandscape) 0.014f else 0.017f,
+                bottomBand.height() * 0.24f,
+            )
+            letterSpacing = 0.04f
         }
 
-        return bounds.outWidth.toFloat() / bounds.outHeight.toFloat()
+        drawTopRightDateBadge(
+            canvas = canvas,
+            canvasRect = canvasRect,
+            topBand = topBand,
+            palette = palette,
+            today = today,
+            isLandscape = isLandscape,
+        )
+
+        val brandCenterY = topBand.centerY() + topBand.height() * 0.05f
+        canvas.drawText(
+            "The Day",
+            canvasRect.centerX(),
+            centeredBaseline(brandPaint, brandCenterY),
+            brandPaint,
+        )
+        canvas.drawText(
+            "记录值得记住的每一天",
+            canvasRect.centerX(),
+            centeredBaseline(sloganPaint, bottomBand.centerY()),
+            sloganPaint,
+        )
+    }
+
+    internal fun drawTopRightDateBadge(
+        canvas: Canvas,
+        canvasRect: RectF,
+        topBand: RectF,
+        palette: MemoryImagePalette,
+        today: LocalDate,
+        isLandscape: Boolean,
+    ) {
+        val dateText = String.format(
+            Locale.US,
+            "%04d/%02d/%02d",
+            today.year,
+            today.monthValue,
+            today.dayOfMonth,
+        )
+        val baseSize = min(canvasRect.width(), canvasRect.height())
+        val initialTextSize = min(
+            baseSize * if (isLandscape) 0.14f else 0.14f,
+            topBand.height() * 0.4f,
+        )
+        val rightMargin = canvasRect.width() * if (isLandscape) 0.05f else 0.045f
+        val topMargin = topBand.height() * 0.28f
+        val anchorX = canvasRect.right - rightMargin
+        val maxDateWidth = canvasRect.width() * TOP_RIGHT_DATE_MAX_WIDTH_FRACTION
+        val measuredInitialWidth = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.RIGHT
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = initialTextSize
+        }.measureText(dateText)
+        val textSize = if (measuredInitialWidth > maxDateWidth && measuredInitialWidth > 0f) {
+            initialTextSize * (maxDateWidth / measuredInitialWidth)
+        } else {
+            initialTextSize
+        }
+
+        val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (palette.isDark) {
+                Color.argb(110, 241, 209, 120)
+            } else {
+                Color.argb(72, 205, 156, 52)
+            }
+            textAlign = Paint.Align.RIGHT
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            this.textSize = textSize
+            setShadowLayer(
+                textSize * 0.45f,
+                0f,
+                textSize * 0.1f,
+                color,
+            )
+        }
+
+        val goldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.RIGHT
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            this.textSize = textSize
+            val dateWidth = measureText(dateText).coerceAtMost(maxDateWidth)
+            shader = LinearGradient(
+                anchorX - dateWidth,
+                0f,
+                anchorX,
+                textSize,
+                intArrayOf(
+                    if (palette.isDark) Color.rgb(255, 244, 196) else Color.rgb(190, 141, 30),
+                    if (palette.isDark) Color.rgb(232, 189, 93) else Color.rgb(229, 186, 71),
+                    if (palette.isDark) Color.rgb(255, 232, 161) else Color.rgb(166, 119, 18),
+                ),
+                floatArrayOf(0f, 0.52f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+
+        val highlightPaint = Paint(goldPaint).apply {
+            shader = null
+            color = if (palette.isDark) {
+                Color.argb(62, 255, 249, 226)
+            } else {
+                Color.argb(50, 255, 255, 255)
+            }
+        }
+
+        val baseline = centeredBaseline(glowPaint, canvasRect.top + topMargin + textSize * 0.5f)
+        canvas.drawText(dateText, anchorX, baseline, glowPaint)
+        canvas.drawText(dateText, anchorX, baseline, goldPaint)
+        canvas.drawText(dateText, anchorX, baseline - textSize * 0.055f, highlightPaint)
+    }
+
+    private fun drawCardSurface(
+        canvas: Canvas,
+        cardRect: RectF,
+        palette: MemoryImagePalette,
+        hasBackgroundImage: Boolean,
+    ) {
+        val colors = if (hasBackgroundImage) {
+            intArrayOf(
+                withAlpha(Color.WHITE, 14),
+                Color.TRANSPARENT,
+            )
+        } else {
+            intArrayOf(
+                withAlpha(palette.surface, if (palette.isDark) 28 else 24),
+                withAlpha(palette.surface, if (palette.isDark) 12 else 8),
+            )
+        }
+        val stops = floatArrayOf(0f, 1f)
+        val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                cardRect.left,
+                cardRect.top,
+                cardRect.right,
+                cardRect.bottom,
+                colors,
+                stops,
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(cardRect, surfacePaint)
+    }
+
+    private fun drawCardOverlay(
+        canvas: Canvas,
+        cardRect: RectF,
+        palette: MemoryImagePalette,
+        hasBackgroundImage: Boolean,
+    ) {
+        if (hasBackgroundImage) {
+            val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f,
+                    cardRect.top,
+                    0f,
+                    cardRect.bottom,
+                    intArrayOf(
+                        Color.argb(86, 0, 0, 0),
+                        Color.argb(48, 0, 0, 0),
+                        Color.argb(112, 0, 0, 0),
+                        Color.argb(186, 0, 0, 0),
+                    ),
+                    floatArrayOf(0f, 0.22f, 0.58f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.drawRect(cardRect, overlayPaint)
+        } else {
+            val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    cardRect.left,
+                    cardRect.top,
+                    cardRect.left,
+                    cardRect.bottom,
+                    intArrayOf(
+                        withAlpha(Color.WHITE, if (palette.isDark) 26 else 72),
+                        Color.TRANSPARENT,
+                    ),
+                    floatArrayOf(0f, 0.32f),
+                    Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.drawRect(cardRect, highlightPaint)
+        }
     }
 
     private fun drawBaseRegions(
@@ -498,6 +906,7 @@ object EventMemoryImageRenderer {
         cardRect: RectF,
         palette: MemoryImagePalette,
         template: MemoryImageTemplate,
+        hasBackgroundImage: Boolean,
     ) {
         val random = Random.Default
 
@@ -507,6 +916,7 @@ object EventMemoryImageRenderer {
                 cardRect = cardRect,
                 palette = palette,
                 random = random,
+                hasBackgroundImage = hasBackgroundImage,
             )
 
             MemoryImageTemplate.STARS -> drawStarTemplate(
@@ -514,6 +924,15 @@ object EventMemoryImageRenderer {
                 cardRect = cardRect,
                 palette = palette,
                 random = random,
+                hasBackgroundImage = hasBackgroundImage,
+            )
+
+            MemoryImageTemplate.HEARTS -> drawHeartTemplate(
+                canvas = canvas,
+                cardRect = cardRect,
+                palette = palette,
+                random = random,
+                hasBackgroundImage = hasBackgroundImage,
             )
 
             MemoryImageTemplate.METEORS -> drawMeteorTemplate(
@@ -521,6 +940,7 @@ object EventMemoryImageRenderer {
                 cardRect = cardRect,
                 palette = palette,
                 random = random,
+                hasBackgroundImage = hasBackgroundImage,
             )
 
             MemoryImageTemplate.WAVES -> drawWaveTemplate(
@@ -528,6 +948,7 @@ object EventMemoryImageRenderer {
                 cardRect = cardRect,
                 palette = palette,
                 random = random,
+                hasBackgroundImage = hasBackgroundImage,
             )
 
             MemoryImageTemplate.MINIMAL -> drawMinimalTemplate(
@@ -535,6 +956,7 @@ object EventMemoryImageRenderer {
                 cardRect = cardRect,
                 palette = palette,
                 random = random,
+                hasBackgroundImage = hasBackgroundImage,
             )
         }
     }
@@ -544,11 +966,24 @@ object EventMemoryImageRenderer {
         cardRect: RectF,
         palette: MemoryImagePalette,
         random: Random,
+        hasBackgroundImage: Boolean,
     ) {
         val baseSize = minOf(cardRect.width(), cardRect.height())
         val profile = decorationAlphaProfile(palette.isDark)
-        val totalCount = 8 + random.nextInt(3)
-        val points = generateDecorationPoints(random, totalCount)
+        val totalCount = if (hasBackgroundImage) {
+            14 + random.nextInt(4)
+        } else {
+            8 + random.nextInt(3)
+        }
+        val points = generateDecorationPoints(random, totalCount, hasBackgroundImage)
+        val filledCount = (totalCount * 3f / 5f)
+            .roundToInt()
+            .coerceIn(0, totalCount)
+        val outlineCount = totalCount - filledCount
+        val circleStyles = MutableList(filledCount) { false }.apply {
+            repeat(outlineCount) { add(true) }
+            shuffle(random)
+        }
 
         val primaryFillAlpha = random.nextInt(profile.primaryFillMin, profile.primaryFillMax + 1)
         val variantFillAlpha = random.nextInt(profile.variantFillMin, profile.variantFillMax + 1)
@@ -567,7 +1002,7 @@ object EventMemoryImageRenderer {
         }
 
         var largeOuterCount = 0
-        points.forEach { point ->
+        points.forEachIndexed { index, point ->
             val cx = cardRect.left + cardRect.width() * point.x
             val cy = cardRect.top + cardRect.height() * point.y
 
@@ -583,7 +1018,7 @@ object EventMemoryImageRenderer {
             }
 
             val radius = baseRadius * point.scale
-            val isStroke = random.nextFloat() < 0.4f
+            val isStroke = circleStyles.getOrElse(index) { false }
 
             val elementPaint = if (isStroke) {
                 Paint(baseStrokePaint).apply {
@@ -606,11 +1041,24 @@ object EventMemoryImageRenderer {
         cardRect: RectF,
         palette: MemoryImagePalette,
         random: Random,
+        hasBackgroundImage: Boolean,
     ) {
         val baseSize = minOf(cardRect.width(), cardRect.height())
         val profile = decorationAlphaProfile(palette.isDark)
-        val totalCount = 12 + random.nextInt(4)
-        val points = generateDecorationPoints(random, totalCount)
+        val totalCount = if (hasBackgroundImage) {
+            16 + random.nextInt(6)
+        } else {
+            12 + random.nextInt(4)
+        }
+        val points = generateDecorationPoints(random, totalCount, hasBackgroundImage)
+        val filledCount = (totalCount * 3f / 5f)
+            .roundToInt()
+            .coerceIn(0, totalCount)
+        val outlineCount = totalCount - filledCount
+        val starStyles = MutableList(filledCount) { false }.apply {
+            repeat(outlineCount) { add(true) }
+            shuffle(random)
+        }
 
         val primaryFillAlpha = random.nextInt(profile.primaryFillMin, profile.primaryFillMax + 1)
         val variantFillAlpha = random.nextInt(profile.variantFillMin, profile.variantFillMax + 1)
@@ -629,7 +1077,7 @@ object EventMemoryImageRenderer {
         }
 
         var largeOuterCount = 0
-        points.forEach { point ->
+        points.forEachIndexed { index, point ->
             val cx = cardRect.left + cardRect.width() * point.x
             val cy = cardRect.top + cardRect.height() * point.y
 
@@ -645,7 +1093,7 @@ object EventMemoryImageRenderer {
             }
 
             val radius = baseRadius * point.scale
-            val isStroke = point.isCenter || random.nextFloat() < 0.55f
+            val isStroke = starStyles.getOrElse(index) { false }
 
             val elementPaint = if (isStroke) {
                 Paint(baseStrokePaint).apply {
@@ -695,16 +1143,199 @@ object EventMemoryImageRenderer {
         canvas.drawPath(path, paint)
     }
 
+    private fun drawHeartTemplate(
+        canvas: Canvas,
+        cardRect: RectF,
+        palette: MemoryImagePalette,
+        random: Random,
+        hasBackgroundImage: Boolean,
+    ) {
+        val baseSize = minOf(cardRect.width(), cardRect.height())
+        val profile = decorationAlphaProfile(palette.isDark)
+        val totalCount = if (hasBackgroundImage) {
+            20 + random.nextInt(6)
+        } else {
+            16 + random.nextInt(5)
+        }
+        val points = generateDecorationPoints(
+            random = random,
+            totalCount = totalCount,
+            hasBackgroundImage = hasBackgroundImage,
+        )
+        val filledCount = (totalCount * 3f / 5f)
+            .roundToInt()
+            .coerceIn(0, totalCount)
+        val outlineCount = totalCount - filledCount
+        val heartStyles = MutableList(filledCount) { false }.apply {
+            repeat(outlineCount) { add(true) }
+            shuffle(random)
+        }
+
+        val roseColor = blendArgb(
+            palette.primary,
+            Color.rgb(236, 72, 118),
+            if (palette.isDark) 0.34f else 0.44f,
+        )
+        val softRoseColor = blendArgb(
+            palette.primaryContainer,
+            Color.rgb(255, 164, 188),
+            if (palette.isDark) 0.3f else 0.4f,
+        )
+        val primaryFillAlpha = random.nextInt(
+            profile.primaryFillMin + 4,
+            profile.primaryFillMax + 9,
+        )
+        val variantFillAlpha = random.nextInt(
+            profile.variantFillMin + 3,
+            profile.variantFillMax + 8,
+        )
+        val strokeAlpha = random.nextInt(
+            profile.primaryStrokeMin + 3,
+            profile.primaryStrokeMax + 10,
+        )
+
+        val primaryFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = roseColor
+            style = Paint.Style.FILL
+        }
+        val softFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = softRoseColor
+            style = Paint.Style.FILL
+        }
+        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = roseColor
+            style = Paint.Style.STROKE
+            strokeWidth = baseSize * 0.0026f
+            strokeJoin = Paint.Join.ROUND
+            strokeCap = Paint.Cap.ROUND
+        }
+
+        var largeOuterCount = 0
+        points.forEachIndexed { index, point ->
+            val cx = cardRect.left + cardRect.width() * point.x
+            val cy = cardRect.top + cardRect.height() * point.y
+            val baseRadius = if (point.isCenter) {
+                baseSize * (0.018f + random.nextFloat() * 0.026f)
+            } else if (
+                largeOuterCount < 2 &&
+                random.nextFloat() < 0.22f
+            ) {
+                largeOuterCount++
+                baseSize * (0.07f + random.nextFloat() * 0.025f)
+            } else {
+                baseSize * (0.028f + random.nextFloat() * 0.045f)
+            }
+            val radius = baseRadius * point.scale
+            val isStroke = heartStyles.getOrElse(index) { false }
+            val paint = if (isStroke) {
+                Paint(strokePaint).apply {
+                    alpha = (strokeAlpha * point.alphaScale)
+                        .roundToInt()
+                        .coerceIn(0, 255)
+                }
+            } else {
+                val basePaint = if (random.nextFloat() < 0.62f) {
+                    primaryFillPaint
+                } else {
+                    softFillPaint
+                }
+                val baseAlpha = if (basePaint === primaryFillPaint) {
+                    primaryFillAlpha
+                } else {
+                    variantFillAlpha
+                }
+                Paint(basePaint).apply {
+                    alpha = (baseAlpha * point.alphaScale)
+                        .roundToInt()
+                        .coerceIn(0, 255)
+                    if (!point.isCenter && random.nextFloat() < 0.28f) {
+                        setShadowLayer(
+                            radius * 0.32f,
+                            0f,
+                            radius * 0.08f,
+                            withAlpha(roseColor, 70),
+                        )
+                    }
+                }
+            }
+            val tilt = (point.rotation % 50f) - 25f
+            drawHeart(
+                canvas = canvas,
+                cx = cx,
+                cy = cy,
+                radius = radius,
+                paint = paint,
+                rotation = tilt,
+            )
+        }
+    }
+
+    private fun drawHeart(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        radius: Float,
+        paint: Paint,
+        rotation: Float,
+    ) {
+        val path = Path().apply {
+            moveTo(0f, radius * 0.62f)
+            cubicTo(
+                -radius * 0.12f,
+                radius * 0.42f,
+                -radius * 0.82f,
+                radius * 0.06f,
+                -radius * 0.82f,
+                -radius * 0.38f,
+            )
+            cubicTo(
+                -radius * 0.82f,
+                -radius * 0.82f,
+                -radius * 0.28f,
+                -radius * 0.98f,
+                0f,
+                -radius * 0.48f,
+            )
+            cubicTo(
+                radius * 0.28f,
+                -radius * 0.98f,
+                radius * 0.82f,
+                -radius * 0.82f,
+                radius * 0.82f,
+                -radius * 0.38f,
+            )
+            cubicTo(
+                radius * 0.82f,
+                radius * 0.06f,
+                radius * 0.12f,
+                radius * 0.42f,
+                0f,
+                radius * 0.62f,
+            )
+            close()
+        }
+        val saveCount = canvas.save()
+        canvas.translate(cx, cy)
+        canvas.rotate(rotation)
+        canvas.drawPath(path, paint)
+        canvas.restoreToCount(saveCount)
+    }
+
     private fun drawMeteorTemplate(
         canvas: Canvas,
         cardRect: RectF,
         palette: MemoryImagePalette,
         random: Random,
+        hasBackgroundImage: Boolean,
     ) {
         val baseSize = minOf(cardRect.width(), cardRect.height())
         val profile = decorationAlphaProfile(palette.isDark)
-        val totalCount = 7 + random.nextInt(3)
-        val points = generateDecorationPoints(random, totalCount)
+        val totalCount = if (hasBackgroundImage) {
+            20 + random.nextInt(4)
+        } else {
+            7 + random.nextInt(3)
+        }
+        val points = generateDecorationPoints(random, totalCount, hasBackgroundImage)
 
         val strokeAlpha = random.nextInt(profile.primaryStrokeMin, profile.primaryStrokeMax + 1)
         val headAlpha = random.nextInt(profile.variantFillMin, profile.variantFillMax + 1)
@@ -758,6 +1389,7 @@ object EventMemoryImageRenderer {
         cardRect: RectF,
         palette: MemoryImagePalette,
         random: Random,
+        hasBackgroundImage: Boolean,
     ) {
         val baseSize = minOf(cardRect.width(), cardRect.height())
         val profile = decorationAlphaProfile(palette.isDark)
@@ -776,12 +1408,25 @@ object EventMemoryImageRenderer {
         val width = cardRect.width()
         val height = cardRect.height()
 
-        val centerCount = (10 + random.nextInt(3)) / 5
-        val outerCount = (10 + random.nextInt(3)) - centerCount
+        val totalCount = if (hasBackgroundImage) {
+            20 + random.nextInt(4)
+        } else {
+            10 + random.nextInt(3)
+        }
+        val distribution = decorationDistribution(hasBackgroundImage)
+        val centerCount = ((totalCount * distribution.centerWeight.toFloat()) /
+            (distribution.centerWeight + distribution.outerWeight))
+            .roundToInt()
+            .coerceIn(1, totalCount - 1)
+        val outerCount = totalCount - centerCount
 
         for (i in 0 until centerCount) {
             val path = Path()
-            val y = cardRect.top + height * (0.28f + random.nextFloat() * 0.44f)
+            val y = if (hasBackgroundImage) {
+                cardRect.top + height * (0.34f + random.nextFloat() * 0.32f)
+            } else {
+                cardRect.top + height * (0.28f + random.nextFloat() * 0.44f)
+            }
             val amplitude = height * 0.015f
 
             path.moveTo(cardRect.left + width * 0.2f, y)
@@ -877,10 +1522,15 @@ object EventMemoryImageRenderer {
         cardRect: RectF,
         palette: MemoryImagePalette,
         random: Random,
+        hasBackgroundImage: Boolean,
     ) {
         val baseSize = minOf(cardRect.width(), cardRect.height())
-        val totalCount = 7 + random.nextInt(3)
-        val points = generateDecorationPoints(random, totalCount)
+        val totalCount = if (hasBackgroundImage) {
+            9 + random.nextInt(4)
+        } else {
+            7 + random.nextInt(3)
+        }
+        val points = generateDecorationPoints(random, totalCount, hasBackgroundImage)
 
         points.forEachIndexed { index, point ->
             val cx = cardRect.left + cardRect.width() * point.x
@@ -1051,34 +1701,44 @@ object EventMemoryImageRenderer {
                 count = abs(delta).toString(),
                 color = textColor,
                 secondaryColor = secondaryColor,
+                glowColor = palette.primary,
                 centerY = centerY,
-                mainImageHeight = mainImageHeight,
                 mainRect = mainRect,
             )
         }
 
-        val dateBottom = mainRect.bottom - mainImageHeight * 0.1f
         val dateText = "${DateFormatting.longDate(displayDate, locale)} · " +
             DateFormatting.weekday(displayDate, locale)
+        val dateReferenceSize = min(
+            mainRect.width(),
+            mainRect.height(),
+        )
 
         val datePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = secondaryColor
-            textSize = mainImageHeight * 0.055f
+            textSize = dateReferenceSize * 0.055f
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         }
 
-        val fittedDate = TextUtils.ellipsize(
-            dateText,
-            datePaint,
-            mainRect.width() * 0.88f,
-            TextUtils.TruncateAt.END,
-        ).toString()
+        val dateMaxWidth = mainRect.width() * 0.88f
+        fitTextSize(
+            paint = datePaint,
+            text = dateText,
+            maxWidth = dateMaxWidth,
+            minSize = dateReferenceSize * 0.032f,
+        )
+        val measuredDateWidth = datePaint.measureText(dateText)
+        if (measuredDateWidth > dateMaxWidth) {
+            datePaint.textSize *= dateMaxWidth / measuredDateWidth
+        }
 
+        val dateBaseline =
+            mainRect.bottom - mainImageHeight * 0.07f - datePaint.descent()
         canvas.drawText(
-            fittedDate,
+            dateText,
             mainRect.centerX(),
-            centeredBaseline(datePaint, dateBottom),
+            dateBaseline,
             datePaint,
         )
     }
@@ -1164,48 +1824,102 @@ object EventMemoryImageRenderer {
         count: String,
         color: Int,
         secondaryColor: Int,
+        glowColor: Int,
         centerY: Float,
-        mainImageHeight: Float,
         mainRect: RectF,
     ) {
+        val sizeReference = min(
+            mainRect.width(),
+            mainRect.height(),
+        )
+        val isPortrait =
+            mainRect.height() > mainRect.width() * 1.08f
+        val numberSizeFactor = if (isPortrait) {
+            0.24f
+        } else {
+            0.31f
+        }
+
         val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = color
             textAlign = Paint.Align.LEFT
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textSize = mainImageHeight * 0.36f
+            textSize = sizeReference * numberSizeFactor
         }
 
         fitTextSize(
             paint = numberPaint,
             text = count,
-            maxWidth = mainRect.width() * 0.75f,
-            minSize = mainImageHeight * 0.15f,
+            maxWidth = mainRect.width() * 0.64f,
+            minSize = sizeReference * 0.14f,
         )
 
         val unitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = secondaryColor
             textAlign = Paint.Align.LEFT
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-            textSize = mainImageHeight * 0.075f
+            textSize = sizeReference * 0.05f
         }
 
-        val gap = mainImageHeight * 0.025f
+        val gap = sizeReference * 0.025f
         val numberWidth = numberPaint.measureText(count)
         val unitWidth = unitPaint.measureText("天")
         val totalWidth = numberWidth + gap + unitWidth
         val startX = mainRect.centerX() - totalWidth / 2f
+        val numberBaseline = centeredBaseline(
+            numberPaint,
+            centerY,
+        )
+
+        val innerGlowColor = blendArgb(
+            glowColor,
+            Color.WHITE,
+            0.20f,
+        )
+        val outerGlowPaint = Paint(numberPaint).apply {
+            this.color = withAlpha(glowColor, 28)
+            setShadowLayer(
+                numberPaint.textSize * 0.16f,
+                0f,
+                0f,
+                withAlpha(glowColor, 205),
+            )
+        }
+        val innerGlowPaint = Paint(numberPaint).apply {
+            this.color = withAlpha(innerGlowColor, 22)
+            setShadowLayer(
+                numberPaint.textSize * 0.065f,
+                0f,
+                0f,
+                withAlpha(innerGlowColor, 175),
+            )
+        }
 
         canvas.drawText(
             count,
             startX,
-            centeredBaseline(numberPaint, centerY),
+            numberBaseline,
+            outerGlowPaint,
+        )
+        canvas.drawText(
+            count,
+            startX,
+            numberBaseline,
+            innerGlowPaint,
+        )
+        canvas.drawText(
+            count,
+            startX,
+            numberBaseline,
             numberPaint,
         )
 
+        val unitBaseline =
+            numberBaseline + numberPaint.descent() - unitPaint.descent()
         canvas.drawText(
             "天",
             startX + numberWidth + gap,
-            centerY - numberPaint.textSize * 0.12f,
+            unitBaseline,
             unitPaint,
         )
     }
@@ -1302,21 +2016,14 @@ object EventMemoryImageRenderer {
             throw IOException("Invalid background image")
         }
 
-        val focusX = if (image.focusX.isFinite()) {
-            image.focusX.coerceIn(0f, 1f)
-        } else {
-            0.5f
-        }
-        val focusY = if (image.focusY.isFinite()) {
-            image.focusY.coerceIn(0f, 1f)
-        } else {
-            0.5f
-        }
+        val transform = image.transformFor(ImagePlacementTarget.DETAIL)
+        val focusX = transform.focusX
+        val focusY = transform.focusY
 
         val scale = maxOf(
             destination.width() / bitmap.width.toFloat(),
             destination.height() / bitmap.height.toFloat(),
-        )
+        ) * transform.zoom
         val scaledWidth = bitmap.width * scale
         val scaledHeight = bitmap.height * scale
         val overflowX = (scaledWidth - destination.width()).coerceAtLeast(0f)

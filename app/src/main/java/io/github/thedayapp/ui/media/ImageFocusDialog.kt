@@ -39,7 +39,8 @@ internal enum class ImageFocusPreviewMode {
 
 private data class FocusPreviewSpec(
     val label: String,
-    val aspectRatio: Float,
+    val eventCardType: EventImageCardType? = null,
+    val fixedAspectRatio: Float? = null,
 )
 
 @Composable
@@ -71,18 +72,18 @@ internal fun ImageFocusDialog(
         ImageFocusPreviewMode.EVENT_BACKGROUND -> listOf(
             FocusPreviewSpec(
                 label = "首页主卡",
-                aspectRatio = 1.65f,
+                eventCardType = EventImageCardType.HOME_HERO,
             ),
             FocusPreviewSpec(
                 label = "详情大卡",
-                aspectRatio = 1.25f,
+                eventCardType = EventImageCardType.DETAIL,
             ),
         )
 
         ImageFocusPreviewMode.CATEGORY_COVER -> listOf(
             FocusPreviewSpec(
                 label = "分类书册",
-                aspectRatio = 0.72f,
+                fixedAspectRatio = 0.72f,
             ),
         )
     }
@@ -112,7 +113,8 @@ internal fun ImageFocusDialog(
 
                 Text(
                     text = when (mode) {
-                        ImageFocusPreviewMode.EVENT_BACKGROUND -> "调整后会同时用于首页主卡和详情大卡"
+                        ImageFocusPreviewMode.EVENT_BACKGROUND ->
+                            "卡片会尽量跟随图片比例；比例过宽或过高时会自动限制尺寸"
                         ImageFocusPreviewMode.CATEGORY_COVER -> "调整后会用于分类书册"
                     },
                     style = MaterialTheme.typography.bodyMedium,
@@ -232,6 +234,16 @@ private fun FocusPreview(
     image: LocalImageReference,
     imageBitmap: ImageBitmap?,
 ) {
+    val previewAspectRatio = spec.eventCardType
+        ?.let { type ->
+            adaptiveEventImagePreviewAspectRatio(
+                image = image,
+                type = type,
+            )
+        }
+        ?: spec.fixedAspectRatio
+        ?: 1f
+
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = spec.label,
@@ -241,7 +253,7 @@ private fun FocusPreview(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(spec.aspectRatio),
+                .aspectRatio(previewAspectRatio),
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {

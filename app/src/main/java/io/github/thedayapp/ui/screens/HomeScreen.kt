@@ -10,13 +10,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -62,6 +67,8 @@ private enum class HomeFilter {
 fun HomeScreen(
     state: TheDayState,
     onOpenEvent: (String) -> Unit,
+    onAdjustHeroImage: (String) -> Unit,
+    onCreateEvent: () -> Unit,
     bottomBar: @Composable () -> Unit,
 ) {
     val locale = Locale.getDefault()
@@ -165,6 +172,19 @@ fun HomeScreen(
                         }
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = onCreateEvent,
+                        modifier = Modifier.size(52.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.AddCircle,
+                            contentDescription = "新建日子",
+                            modifier = Modifier.size(36.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                },
             )
         },
         bottomBar = bottomBar,
@@ -185,6 +205,22 @@ fun HomeScreen(
                     today = state.today,
                     locale = locale,
                     onClick = hero?.let { { onOpenEvent(it.id) } },
+                    onAdjustImage = hero
+                        ?.takeIf { it.backgroundImage != null }
+                        ?.let { event ->
+                            { onAdjustHeroImage(event.id) }
+                        },
+                    onImageTransformChange = hero
+                        ?.takeIf { it.backgroundImage != null }
+                        ?.let { event ->
+                            { transform ->
+                                state.updateEventImageTransform(
+                                    eventId = event.id,
+                                    target = io.github.thedayapp.data.ImagePlacementTarget.HOME,
+                                    transform = transform,
+                                )
+                            }
+                        },
                     emptyTitle = if (hiddenPastOnly) "暂无可显示事件" else "暂无事件",
                 )
             }

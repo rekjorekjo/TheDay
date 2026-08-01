@@ -7,18 +7,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import io.github.thedayapp.data.ImagePlacementTarget
 import io.github.thedayapp.data.TheDayState
 import io.github.thedayapp.ui.components.TheDayBottomBar
 import io.github.thedayapp.ui.components.TheDayTab
+import io.github.thedayapp.ui.screens.AboutScreen
 import io.github.thedayapp.ui.screens.CategoryDetailScreen
 import io.github.thedayapp.ui.screens.CategoryScreen
+import io.github.thedayapp.ui.screens.DocumentViewerScreen
 import io.github.thedayapp.ui.screens.EventDetailScreen
 import io.github.thedayapp.ui.screens.EventEditorScreen
+import io.github.thedayapp.ui.screens.ExportScreen
 import io.github.thedayapp.ui.screens.HomeScreen
+import io.github.thedayapp.ui.screens.ImageTransformScreen
 import io.github.thedayapp.ui.screens.SettingsScreen
+import io.github.thedayapp.ui.documents.AppDocument
 
 private sealed interface EventReturnTarget {
     data object Home : EventReturnTarget
+    data object Export : EventReturnTarget
     data class Category(val categoryName: String) : EventReturnTarget
 }
 
@@ -27,7 +34,10 @@ private sealed interface Screen {
     data object Categories : Screen
     data class CategoryDetail(val categoryName: String) : Screen
     data object New : Screen
+    data object Export : Screen
     data object Settings : Screen
+    data object About : Screen
+    data class Document(val document: AppDocument) : Screen
     data class Detail(
         val eventId: String,
         val returnTarget: EventReturnTarget = EventReturnTarget.Home,
@@ -36,11 +46,18 @@ private sealed interface Screen {
         val eventId: String,
         val returnTarget: EventReturnTarget = EventReturnTarget.Home,
     ) : Screen
+    data class ImageAdjust(
+        val eventId: String,
+        val target: ImagePlacementTarget,
+        val returnTarget: EventReturnTarget = EventReturnTarget.Home,
+        val returnToDetail: Boolean,
+    ) : Screen
 }
 
 private fun EventReturnTarget.toScreen(): Screen {
     return when (this) {
         EventReturnTarget.Home -> Screen.Home
+        EventReturnTarget.Export -> Screen.Export
         is EventReturnTarget.Category -> Screen.CategoryDetail(categoryName)
     }
 }
@@ -77,11 +94,25 @@ fun TheDayApp(
                     editor.returnTarget.toScreen()
                 }
             }
+            is Screen.ImageAdjust -> {
+                val adjust = screen as Screen.ImageAdjust
+                if (adjust.returnToDetail) {
+                    Screen.Detail(
+                        eventId = adjust.eventId,
+                        returnTarget = adjust.returnTarget,
+                    )
+                } else {
+                    adjust.returnTarget.toScreen()
+                }
+            }
             is Screen.Detail -> (screen as Screen.Detail).returnTarget.toScreen()
             is Screen.New -> Screen.Home
             is Screen.CategoryDetail -> Screen.Categories
             is Screen.Categories -> Screen.Home
+            is Screen.Export -> Screen.Home
             is Screen.Settings -> Screen.Home
+            is Screen.About -> Screen.Settings
+            is Screen.Document -> Screen.About
             else -> Screen.Home
         }
     }
@@ -95,12 +126,21 @@ fun TheDayApp(
                     returnTarget = EventReturnTarget.Home,
                 )
             },
+            onAdjustHeroImage = { eventId ->
+                screen = Screen.ImageAdjust(
+                    eventId = eventId,
+                    target = ImagePlacementTarget.HOME,
+                    returnTarget = EventReturnTarget.Home,
+                    returnToDetail = false,
+                )
+            },
+            onCreateEvent = { screen = Screen.New },
             bottomBar = {
                 TheDayBottomBar(
                     selectedTab = TheDayTab.DAYS,
                     onDaysClick = { screen = Screen.Home },
                     onCategoriesClick = { screen = Screen.Categories },
-                    onNewClick = { screen = Screen.New },
+                    onExportClick = { screen = Screen.Export },
                     onSettingsClick = { screen = Screen.Settings },
                 )
             },
@@ -117,7 +157,7 @@ fun TheDayApp(
                     selectedTab = TheDayTab.CATEGORIES,
                     onDaysClick = { screen = Screen.Home },
                     onCategoriesClick = { screen = Screen.Categories },
-                    onNewClick = { screen = Screen.New },
+                    onExportClick = { screen = Screen.Export },
                     onSettingsClick = { screen = Screen.Settings },
                 )
             },
@@ -137,7 +177,7 @@ fun TheDayApp(
 
         Screen.New -> EventEditorScreen(
             existing = null,
-            onBack = null,
+            onBack = { screen = Screen.Home },
             onSave = { event ->
                 state.upsertEvent(event)
                 state.clearNewEventDraft()
@@ -146,21 +186,32 @@ fun TheDayApp(
                     returnTarget = EventReturnTarget.Home,
                 )
             },
-            bottomBar = {
-                TheDayBottomBar(
-                    selectedTab = TheDayTab.NEW,
-                    onDaysClick = { screen = Screen.Home },
-                    onCategoriesClick = { screen = Screen.Categories },
-                    onNewClick = { screen = Screen.New },
-                    onSettingsClick = { screen = Screen.Settings },
-                )
-            },
             initialDraft = state.newEventDraft,
             onDraftSave = state::saveNewEventDraft,
             onDraftClear = state::clearNewEventDraft,
             initialBackgroundImage = state.newEventDraft?.backgroundImage,
             onImportBackgroundImage = state::importLocalImage,
+            onRecropBackgroundImage = state::recropLocalImage,
             onReleaseBackgroundImage = state::releaseLocalImageIfUnreferenced,
+        )
+
+        Screen.Export -> ExportScreen(
+            state = state,
+            bottomBar = {
+                TheDayBottomBar(
+                    selectedTab = TheDayTab.EXPORT,
+                    onDaysClick = { screen = Screen.Home },
+                    onCategoriesClick = { screen = Screen.Categories },
+                    onExportClick = { screen = Screen.Export },
+                    onSettingsClick = { screen = Screen.Settings },
+                )
+            },
+            onOpenEvent = { eventId ->
+                screen = Screen.Detail(
+                    eventId = eventId,
+                    returnTarget = EventReturnTarget.Export,
+                )
+            },
         )
 
         Screen.Settings -> SettingsScreen(
@@ -170,10 +221,21 @@ fun TheDayApp(
                     selectedTab = TheDayTab.SETTINGS,
                     onDaysClick = { screen = Screen.Home },
                     onCategoriesClick = { screen = Screen.Categories },
-                    onNewClick = { screen = Screen.New },
+                    onExportClick = { screen = Screen.Export },
                     onSettingsClick = { screen = Screen.Settings },
                 )
             },
+            onOpenAbout = { screen = Screen.About },
+        )
+
+        Screen.About -> AboutScreen(
+            onBack = { screen = Screen.Settings },
+            onOpenDocument = { document -> screen = Screen.Document(document) },
+        )
+
+        is Screen.Document -> DocumentViewerScreen(
+            document = (screen as Screen.Document).document,
+            onBack = { screen = Screen.About },
         )
 
         is Screen.Detail -> {
@@ -198,6 +260,62 @@ fun TheDayApp(
                         screen = current.returnTarget.toScreen()
                     },
                     onTogglePinned = { state.togglePinned(event.id) },
+                    onAdjustImage = {
+                        screen = Screen.ImageAdjust(
+                            eventId = event.id,
+                            target = ImagePlacementTarget.DETAIL,
+                            returnTarget = current.returnTarget,
+                            returnToDetail = true,
+                        )
+                    },
+                    onImageTransformChange = { transform ->
+                        state.updateEventImageTransform(
+                            eventId = event.id,
+                            target = ImagePlacementTarget.DETAIL,
+                            transform = transform,
+                        )
+                    },
+                )
+            }
+        }
+
+        is Screen.ImageAdjust -> {
+            val event = state.eventById(current.eventId)
+            if (event == null || event.backgroundImage == null) {
+                LaunchedEffect(current.eventId) {
+                    screen = if (current.returnToDetail && event != null) {
+                        Screen.Detail(
+                            eventId = current.eventId,
+                            returnTarget = current.returnTarget,
+                        )
+                    } else {
+                        current.returnTarget.toScreen()
+                    }
+                }
+            } else {
+                val returnScreen: () -> Unit = {
+                    screen = if (current.returnToDetail) {
+                        Screen.Detail(
+                            eventId = current.eventId,
+                            returnTarget = current.returnTarget,
+                        )
+                    } else {
+                        current.returnTarget.toScreen()
+                    }
+                }
+                ImageTransformScreen(
+                    event = event,
+                    today = state.today,
+                    target = current.target,
+                    onBack = returnScreen,
+                    onSave = { transform ->
+                        state.updateEventImageTransform(
+                            eventId = event.id,
+                            target = current.target,
+                            transform = transform,
+                        )
+                        returnScreen()
+                    },
                 )
             }
         }
@@ -230,6 +348,7 @@ fun TheDayApp(
                     },
                     initialBackgroundImage = event.backgroundImage,
                     onImportBackgroundImage = state::importLocalImage,
+                    onRecropBackgroundImage = state::recropLocalImage,
                     onReleaseBackgroundImage = state::releaseLocalImageIfUnreferenced,
                 )
             }

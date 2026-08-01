@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="io.github.thedayapp.widget.DayWidgetConfigureActivity"
     android:description="@string/widget_description"
     android:initialLayout="@layout/the_day_widget"
     android:maxResizeHeight="360dp"
@@ -13,4 +14,5 @@
     android:targetCellHeight="2"
     android:targetCellWidth="3"
     android:updatePeriodMillis="0"
+    android:widgetFeatures="reconfigurable"
     android:widgetCategory="home_screen|keyguard" />
