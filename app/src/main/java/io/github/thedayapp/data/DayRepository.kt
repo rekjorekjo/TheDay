@@ -75,6 +75,47 @@ class DayRepository(context: Context) {
         preferences.edit().putString(KEY_EVENTS, array.toString()).apply()
     }
 
+    fun loadMilestones(): List<DayMilestone> {
+        val raw = preferences.getString(KEY_MILESTONES, null) ?: return emptyList()
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    runCatching {
+                        val json = array.getJSONObject(index)
+                        DayMilestone(
+                            id = json.getString("id"),
+                            title = json.getString("title"),
+                            date = LocalDate.parse(json.getString("date")),
+                            note = json.optString("note"),
+                            createdAtEpochMillis = json.optLong(
+                                "createdAtEpochMillis",
+                                System.currentTimeMillis(),
+                            ),
+                        )
+                    }.getOrNull()
+                        ?.takeIf { it.title.isNotBlank() }
+                        ?.let(::add)
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    fun saveMilestones(milestones: List<DayMilestone>) {
+        val array = JSONArray()
+        milestones.forEach { milestone ->
+            array.put(
+                JSONObject()
+                    .put("id", milestone.id)
+                    .put("title", milestone.title)
+                    .put("date", milestone.date.toString())
+                    .put("note", milestone.note)
+                    .put("createdAtEpochMillis", milestone.createdAtEpochMillis),
+            )
+        }
+        preferences.edit().putString(KEY_MILESTONES, array.toString()).apply()
+    }
+
     fun loadSettings(): AppSettings {
         val raw = preferences.getString(KEY_SETTINGS, null) ?: return AppSettings()
         return runCatching {
@@ -363,5 +404,6 @@ class DayRepository(context: Context) {
         private const val KEY_SETTINGS = "settings_json"
         private const val KEY_NEW_EVENT_DRAFT = "new_event_draft_json"
         private const val KEY_CATEGORY_COVERS = "category_covers_json"
+        private const val KEY_MILESTONES = "milestones_json"
     }
 }

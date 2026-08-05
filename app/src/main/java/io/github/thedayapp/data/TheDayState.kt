@@ -27,6 +27,9 @@ class TheDayState(context: Context) {
     var settings: AppSettings by mutableStateOf(repository.loadSettings())
         private set
 
+    var milestones: List<DayMilestone> by mutableStateOf(repository.loadMilestones())
+        private set
+
     var today: LocalDate by mutableStateOf(LocalDate.now())
         private set
 
@@ -170,6 +173,21 @@ class TheDayState(context: Context) {
     fun togglePinned(id: String) {
         val event = eventById(id) ?: return
         upsertEvent(event.copy(isPinned = !event.isPinned))
+    }
+
+    fun upsertMilestone(milestone: DayMilestone) {
+        val existingIndex = milestones.indexOfFirst { it.id == milestone.id }
+        milestones = if (existingIndex >= 0) {
+            milestones.toMutableList().also { it[existingIndex] = milestone }
+        } else {
+            milestones + milestone
+        }.sortedBy { it.date }
+        repository.saveMilestones(milestones)
+    }
+
+    fun deleteMilestone(id: String) {
+        milestones = milestones.filterNot { it.id == id }
+        repository.saveMilestones(milestones)
     }
 
     fun updateSettings(newSettings: AppSettings) {

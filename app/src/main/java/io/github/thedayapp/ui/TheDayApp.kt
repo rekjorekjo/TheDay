@@ -14,13 +14,16 @@ import io.github.thedayapp.ui.components.TheDayTab
 import io.github.thedayapp.ui.screens.AboutScreen
 import io.github.thedayapp.ui.screens.CategoryDetailScreen
 import io.github.thedayapp.ui.screens.CategoryScreen
+import io.github.thedayapp.ui.screens.DateCalculatorScreen
 import io.github.thedayapp.ui.screens.DocumentViewerScreen
 import io.github.thedayapp.ui.screens.EventDetailScreen
 import io.github.thedayapp.ui.screens.EventEditorScreen
 import io.github.thedayapp.ui.screens.ExportScreen
 import io.github.thedayapp.ui.screens.HomeScreen
 import io.github.thedayapp.ui.screens.ImageTransformScreen
+import io.github.thedayapp.ui.screens.MilestoneScreen
 import io.github.thedayapp.ui.screens.SettingsScreen
+import io.github.thedayapp.ui.screens.ToolsScreen
 import io.github.thedayapp.ui.documents.AppDocument
 
 private sealed interface EventReturnTarget {
@@ -34,7 +37,10 @@ private sealed interface Screen {
     data object Categories : Screen
     data class CategoryDetail(val categoryName: String) : Screen
     data object New : Screen
+    data object Tools : Screen
     data object Export : Screen
+    data object Milestones : Screen
+    data object Calculator : Screen
     data object Settings : Screen
     data object About : Screen
     data class Document(val document: AppDocument) : Screen
@@ -109,7 +115,10 @@ fun TheDayApp(
             is Screen.New -> Screen.Home
             is Screen.CategoryDetail -> Screen.Categories
             is Screen.Categories -> Screen.Home
-            is Screen.Export -> Screen.Home
+            is Screen.Export -> Screen.Tools
+            is Screen.Milestones -> Screen.Tools
+            is Screen.Calculator -> Screen.Tools
+            is Screen.Tools -> Screen.Home
             is Screen.Settings -> Screen.Home
             is Screen.About -> Screen.Settings
             is Screen.Document -> Screen.About
@@ -134,18 +143,42 @@ fun TheDayApp(
                     returnToDetail = false,
                 )
             },
-            onCreateEvent = { screen = Screen.New },
+            onOpenTools = { screen = Screen.Tools },
             bottomBar = {
                 TheDayBottomBar(
                     selectedTab = TheDayTab.DAYS,
                     onDaysClick = { screen = Screen.Home },
                     onCategoriesClick = { screen = Screen.Categories },
-                    onExportClick = { screen = Screen.Export },
+                    onNewClick = { screen = Screen.New },
                     onSettingsClick = { screen = Screen.Settings },
                 )
             },
         )
 
+        Screen.Tools -> ToolsScreen(
+            bottomBar = {
+                TheDayBottomBar(
+                    selectedTab = TheDayTab.DAYS,
+                    onDaysClick = { screen = Screen.Home },
+                    onCategoriesClick = { screen = Screen.Categories },
+                    onNewClick = { screen = Screen.New },
+                    onSettingsClick = { screen = Screen.Settings },
+                )
+            },
+            onOpenExport = { screen = Screen.Export },
+            onOpenMilestones = { screen = Screen.Milestones },
+            onOpenCalculator = { screen = Screen.Calculator },
+        )
+
+        Screen.Milestones -> MilestoneScreen(
+            state = state,
+            onBack = { screen = Screen.Tools },
+        )
+
+        Screen.Calculator -> DateCalculatorScreen(
+            today = state.today,
+            onBack = { screen = Screen.Tools },
+        )
         Screen.Categories -> CategoryScreen(
             events = state.events,
             categoryCovers = state.categoryCovers,
@@ -157,7 +190,7 @@ fun TheDayApp(
                     selectedTab = TheDayTab.CATEGORIES,
                     onDaysClick = { screen = Screen.Home },
                     onCategoriesClick = { screen = Screen.Categories },
-                    onExportClick = { screen = Screen.Export },
+                    onNewClick = { screen = Screen.New },
                     onSettingsClick = { screen = Screen.Settings },
                 )
             },
@@ -197,15 +230,8 @@ fun TheDayApp(
 
         Screen.Export -> ExportScreen(
             state = state,
-            bottomBar = {
-                TheDayBottomBar(
-                    selectedTab = TheDayTab.EXPORT,
-                    onDaysClick = { screen = Screen.Home },
-                    onCategoriesClick = { screen = Screen.Categories },
-                    onExportClick = { screen = Screen.Export },
-                    onSettingsClick = { screen = Screen.Settings },
-                )
-            },
+            bottomBar = {},
+            onBack = { screen = Screen.Tools },
             onOpenEvent = { eventId ->
                 screen = Screen.Detail(
                     eventId = eventId,
@@ -221,7 +247,7 @@ fun TheDayApp(
                     selectedTab = TheDayTab.SETTINGS,
                     onDaysClick = { screen = Screen.Home },
                     onCategoriesClick = { screen = Screen.Categories },
-                    onExportClick = { screen = Screen.Export },
+                    onNewClick = { screen = Screen.New },
                     onSettingsClick = { screen = Screen.Settings },
                 )
             },

@@ -120,6 +120,7 @@ private enum class ExportAction {
 fun ExportScreen(
     state: TheDayState,
     bottomBar: @Composable () -> Unit,
+    onBack: () -> Unit,
     onOpenEvent: (String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -377,6 +378,14 @@ fun ExportScreen(
                             containerColor = MaterialTheme.colorScheme.background,
                         ),
                         title = { Text("导出") },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowBack,
+                                    contentDescription = "返回",
+                                )
+                            }
+                        },
                         actions = {
                             TextButton(
                                 onClick = {

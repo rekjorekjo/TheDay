@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,7 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
@@ -54,11 +55,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.thedayapp.R
 import io.github.thedayapp.data.PaletteStyle
@@ -168,27 +174,17 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    PaletteStyle.entries.forEach { style ->
-                        PaletteOption(
-                            style = style,
-                            selected = state.settings.paletteStyle == style,
-                            onClick = {
-                                state.updateSettings(state.settings.copy(paletteStyle = style))
-                            },
-                        )
-                    }
-                }
+                PaletteColorGridSelector(
+                    selectedStyle = state.settings.paletteStyle,
+                    onStyleSelected = { style ->
+                        state.updateSettings(state.settings.copy(paletteStyle = style))
+                    },
+                )
             }
 
             SettingsCard(
                 icon = Icons.Rounded.Sort,
-                title = "事件显示",
+                title = "\u6392\u5e8f",
             ) {
                 SortMode.entries.forEachIndexed { index, mode ->
                     if (index > 0) HorizontalDivider()
@@ -413,54 +409,113 @@ private fun SettingsCard(
     }
 }
 
+private val PaletteTileShape = RoundedCornerShape(10.dp)
+
 @Composable
-private fun PaletteOption(
+private fun PaletteColorGridSelector(
+    selectedStyle: PaletteStyle,
+    onStyleSelected: (PaletteStyle) -> Unit,
+) {
+    val rows = PaletteStyle.entries.chunked(4)
+    val horizontalGap = 8.dp
+    val verticalGap = 8.dp
+
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        val tileWidth = ((maxWidth.value - horizontalGap.value * 3f) / 4f)
+            .coerceAtMost(80f)
+            .coerceAtLeast(54f)
+            .dp
+        val tileHeight = (tileWidth.value * 0.62f).dp
+        val gridWidth = (tileWidth.value * 4f + horizontalGap.value * 3f).dp
+
+        Column(
+            modifier = Modifier.width(gridWidth),
+            verticalArrangement = Arrangement.spacedBy(verticalGap),
+        ) {
+            rows.forEach { row ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(horizontalGap),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    row.forEach { style ->
+                        PaletteColorTile(
+                            style = style,
+                            selected = selectedStyle == style,
+                            width = tileWidth,
+                            height = tileHeight,
+                            onClick = { onStyleSelected(style) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaletteColorTile(
     style: PaletteStyle,
     selected: Boolean,
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit,
 ) {
     val color = palettePreviewColor(style)
-    Column(
-        modifier = Modifier.clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    val borderColor = if (selected) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        Color.White.copy(alpha = 0.34f)
+    }
+
+    Box(
+        modifier = Modifier
+            .size(width = width, height = height)
+            .clip(PaletteTileShape)
+            .background(color)
+            .border(
+                width = if (selected) 3.dp else 1.dp,
+                color = borderColor,
+                shape = PaletteTileShape,
+            )
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = "\u4e3b\u9898\u914d\u8272\uff1a${paletteName(style)}"
+            }
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .then(
-                    if (selected) {
-                        Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                    } else {
-                        Modifier
-                    },
-                )
-                .padding(4.dp)
-                .background(color, CircleShape),
-        )
-        Spacer(Modifier.height(6.dp))
         Text(
-            text = when (style) {
-                PaletteStyle.MIDNIGHT -> "暮蓝"
-                PaletteStyle.CINNABAR -> "朱砂"
-                PaletteStyle.PINE -> "松烟"
-                PaletteStyle.ANTIQUE_GOLD -> "古金"
-                PaletteStyle.BLOOM_PETAL -> "花瓣"
-                PaletteStyle.BLOOM_MIST -> "雾蓝"
-                PaletteStyle.BLOOM_VERDANT -> "草木"
-                PaletteStyle.BLOOM_STONE -> "暖石"
-                PaletteStyle.BLOOM_WHEAT -> "麦穗"
-                PaletteStyle.BLOOM_INK -> "水墨"
-                PaletteStyle.BLOOM_AMBER -> "琥珀"
-                PaletteStyle.BLOOM_LAPIS -> "青金"
-                PaletteStyle.BLOOM_RIPPLE -> "涟漪"
-                PaletteStyle.BLOOM_CINNABAR -> "丹红"
-                PaletteStyle.BLOOM_SAGE -> "鼠尾草"
-                PaletteStyle.BLOOM_SPRING -> "紫语"
-            },
+            text = paletteName(style),
+            color = Color.White,
             style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Clip,
         )
     }
+}
+
+private fun paletteName(style: PaletteStyle): String = when (style) {
+    PaletteStyle.MIDNIGHT -> "\u66ae\u84dd"
+    PaletteStyle.CINNABAR -> "\u6731\u7802"
+    PaletteStyle.PINE -> "\u677e\u70df"
+    PaletteStyle.ANTIQUE_GOLD -> "\u53e4\u91d1"
+    PaletteStyle.BLOOM_PETAL -> "\u82b1\u74f7"
+    PaletteStyle.BLOOM_MIST -> "\u96fe\u84dd"
+    PaletteStyle.BLOOM_VERDANT -> "\u8349\u6728"
+    PaletteStyle.BLOOM_STONE -> "\u6696\u77f3"
+    PaletteStyle.BLOOM_WHEAT -> "\u9ea6\u7a57"
+    PaletteStyle.BLOOM_INK -> "\u6c34\u58a8"
+    PaletteStyle.BLOOM_AMBER -> "\u7425\u73c0"
+    PaletteStyle.BLOOM_LAPIS -> "\u9752\u91d1"
+    PaletteStyle.BLOOM_RIPPLE -> "\u6d9f\u6f2a"
+    PaletteStyle.BLOOM_CINNABAR -> "\u4e39\u7ea2"
+    PaletteStyle.BLOOM_SAGE -> "\u9f20\u5c3e\u8349"
+    PaletteStyle.BLOOM_SPRING -> "\u7d2b\u8bed"
 }
 
 @Composable

@@ -110,6 +110,14 @@ data class NewEventDraft(
     val backgroundImage: LocalImageReference? = null,
 )
 
+data class DayMilestone(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val date: LocalDate,
+    val note: String = "",
+    val createdAtEpochMillis: Long = System.currentTimeMillis(),
+)
+
 data class DayEvent(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
