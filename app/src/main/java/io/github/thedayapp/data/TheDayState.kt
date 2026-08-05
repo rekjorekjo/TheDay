@@ -181,8 +181,23 @@ class TheDayState(context: Context) {
             milestones.toMutableList().also { it[existingIndex] = milestone }
         } else {
             milestones + milestone
-        }.sortedBy { it.date }
+        }
         repository.saveMilestones(milestones)
+    }
+
+    fun moveMilestone(id: String, direction: Int): Boolean {
+        val fromIndex = milestones.indexOfFirst { it.id == id }
+        if (fromIndex !in milestones.indices) return false
+
+        val toIndex = (fromIndex + direction).coerceIn(0, milestones.lastIndex)
+        if (fromIndex == toIndex) return false
+
+        milestones = milestones.toMutableList().also { list ->
+            val moved = list.removeAt(fromIndex)
+            list.add(toIndex, moved)
+        }
+        repository.saveMilestones(milestones)
+        return true
     }
 
     fun deleteMilestone(id: String) {

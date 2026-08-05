@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -340,6 +341,10 @@ fun SettingsScreen(
                 onClick = { confirmClear = true },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.events.isNotEmpty(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
             ) {
                 Icon(Icons.Rounded.Delete, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
@@ -361,7 +366,7 @@ fun SettingsScreen(
                         confirmClear = false
                     },
                 ) {
-                    Text("清空")
+                    Text("清空", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {

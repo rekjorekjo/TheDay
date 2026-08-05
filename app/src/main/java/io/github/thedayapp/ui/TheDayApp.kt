@@ -165,6 +165,7 @@ fun TheDayApp(
                     onSettingsClick = { screen = Screen.Settings },
                 )
             },
+            onBack = { screen = Screen.Home },
             onOpenExport = { screen = Screen.Export },
             onOpenMilestones = { screen = Screen.Milestones },
             onOpenCalculator = { screen = Screen.Calculator },
@@ -210,13 +211,22 @@ fun TheDayApp(
 
         Screen.New -> EventEditorScreen(
             existing = null,
-            onBack = { screen = Screen.Home },
+            onBack = null,
             onSave = { event ->
                 state.upsertEvent(event)
                 state.clearNewEventDraft()
                 screen = Screen.Detail(
                     eventId = event.id,
                     returnTarget = EventReturnTarget.Home,
+                )
+            },
+            bottomBar = {
+                TheDayBottomBar(
+                    selectedTab = TheDayTab.NEW,
+                    onDaysClick = { screen = Screen.Home },
+                    onCategoriesClick = { screen = Screen.Categories },
+                    onNewClick = { screen = Screen.New },
+                    onSettingsClick = { screen = Screen.Settings },
                 )
             },
             initialDraft = state.newEventDraft,

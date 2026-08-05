@@ -2,6 +2,7 @@ package io.github.thedayapp.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,11 +23,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -52,15 +56,15 @@ import java.util.Locale
 import kotlin.math.abs
 
 private enum class CalculatorUnit(val label: String) {
-    DAYS("\u5929"),
-    WEEKS("\u5468"),
-    MONTHS("\u6708"),
-    YEARS("\u5e74"),
+    DAYS("天"),
+    WEEKS("周"),
+    MONTHS("月"),
+    YEARS("年"),
 }
 
 private enum class CalculatorDirection(val label: String) {
-    BEFORE("\u4e4b\u524d"),
-    AFTER("\u4e4b\u540e"),
+    BEFORE("之前"),
+    AFTER("之后"),
 }
 
 private enum class CalculatorDateTarget {
@@ -79,16 +83,14 @@ fun DateCalculatorScreen(
     var offsetStart by remember { mutableStateOf(today) }
     var amountText by remember { mutableStateOf("") }
     var amountUnit by remember { mutableStateOf(CalculatorUnit.DAYS) }
-    var beforeDirection by remember { mutableStateOf(CalculatorDirection.BEFORE) }
-    var afterDirection by remember { mutableStateOf(CalculatorDirection.AFTER) }
+    var direction by remember { mutableStateOf(CalculatorDirection.AFTER) }
     var intervalStart by remember { mutableStateOf(today) }
     var intervalEnd by remember { mutableStateOf(today) }
     var includeStart by remember { mutableStateOf(false) }
     var dateTarget by remember { mutableStateOf<CalculatorDateTarget?>(null) }
 
     val amount = amountText.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
-    val beforeResult = offsetStart.shifted(amount, amountUnit, beforeDirection)
-    val afterResult = offsetStart.shifted(amount, amountUnit, afterDirection)
+    val resultDate = offsetStart.shifted(amount, amountUnit, direction)
     val rawInterval = ChronoUnit.DAYS.between(intervalStart, intervalEnd)
     val intervalDays = rawInterval + if (includeStart && rawInterval >= 0L) 1L else if (includeStart) -1L else 0L
 
@@ -98,10 +100,10 @@ fun DateCalculatorScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
-                title = { Text("\u65e5\u671f\u8ba1\u7b97\u5668") },
+                title = { Text("日期计算器") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "\u8fd4\u56de")
+                        Icon(Icons.Rounded.ArrowBack, contentDescription = "返回")
                     }
                 },
             )
@@ -117,52 +119,66 @@ fun DateCalculatorScreen(
         ) {
             item { Spacer(Modifier.height(4.dp)) }
             item {
-                SectionTitle("\u8ba1\u7b97\u65e5\u671f")
+                SectionTitle("计算日期")
                 Spacer(Modifier.height(10.dp))
                 CalculatorCard {
                     DateRow(
-                        prefix = "\u4ece",
+                        prefix = "从",
                         date = offsetStart,
-                        suffix = "\u5f00\u59cb",
+                        suffix = "开始",
                         locale = locale,
                         onClick = { dateTarget = CalculatorDateTarget.OFFSET_START },
                     )
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = amountText,
-                        onValueChange = { input -> amountText = input.filter(Char::isDigit).take(6) },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("\u8f93\u5165\u6570\u5b57\u8ba1\u7b97") },
-                        suffix = { Text(amountUnit.label) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = amountText,
+                            onValueChange = { input -> amountText = input.filter(Char::isDigit).take(6) },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("数字") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+                        UnitDropdownButton(
+                            selected = amountUnit,
+                            onSelect = { amountUnit = it },
+                        )
+                    }
                     Spacer(Modifier.height(10.dp))
-                    ChipRow(CalculatorUnit.entries, amountUnit) { amountUnit = it }
-                    Spacer(Modifier.height(10.dp))
-                    ChipRow(CalculatorDirection.entries, beforeDirection) { beforeDirection = it }
-                    ResultText(beforeResult, locale)
-                    Spacer(Modifier.height(12.dp))
-                    ChipRow(CalculatorDirection.entries, afterDirection) { afterDirection = it }
-                    ResultText(afterResult, locale)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        DirectionDropdownButton(
+                            selected = direction,
+                            onSelect = { direction = it },
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    ResultText(resultDate, locale)
                 }
             }
             item {
-                SectionTitle("\u8ba1\u7b97\u65e5\u671f\u95f4\u9694")
+                SectionTitle("计算日期间隔")
                 Spacer(Modifier.height(10.dp))
                 CalculatorCard {
                     DateRow(
-                        prefix = "\u4ece",
+                        prefix = "从",
                         date = intervalStart,
-                        suffix = "\u5f00\u59cb\uff0c",
+                        suffix = "开始，",
                         locale = locale,
                         onClick = { dateTarget = CalculatorDateTarget.INTERVAL_START },
                     )
                     Spacer(Modifier.height(10.dp))
                     DateRow(
-                        prefix = "\u81f3",
+                        prefix = "至",
                         date = intervalEnd,
-                        suffix = "\u7ed3\u675f",
+                        suffix = "结束",
                         locale = locale,
                         onClick = { dateTarget = CalculatorDateTarget.INTERVAL_END },
                     )
@@ -172,7 +188,7 @@ fun DateCalculatorScreen(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("\u5171 ", style = MaterialTheme.typography.headlineSmall)
+                        Text("共 ", style = MaterialTheme.typography.headlineSmall)
                         Text(
                             text = abs(intervalDays).toString(),
                             style = MaterialTheme.typography.headlineMedium,
@@ -190,7 +206,7 @@ fun DateCalculatorScreen(
                             checked = includeStart,
                             onCheckedChange = { includeStart = it },
                         )
-                        Text("\u5305\u542b\u8d77\u59cb\u65e5")
+                        Text("包含起始日")
                     }
                 }
             }
@@ -221,10 +237,10 @@ fun DateCalculatorScreen(
                         }
                         dateTarget = null
                     },
-                ) { Text("\u786e\u5b9a") }
+                ) { Text("确定") }
             },
             dismissButton = {
-                TextButton(onClick = { dateTarget = null }) { Text("\u53d6\u6d88") }
+                TextButton(onClick = { dateTarget = null }) { Text("取消") }
             },
         ) {
             DatePicker(state = pickerState)
@@ -285,26 +301,61 @@ private fun DateRow(
 }
 
 @Composable
-private fun <T> ChipRow(
-    values: Iterable<T>,
-    selected: T,
-    onSelect: (T) -> Unit,
-) where T : Enum<T> {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        values.forEach { value ->
-            val label = when (value) {
-                is CalculatorUnit -> value.label
-                is CalculatorDirection -> value.label
-                else -> value.name
+private fun UnitDropdownButton(
+    selected: CalculatorUnit,
+    onSelect: (CalculatorUnit) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.width(76.dp),
+        ) {
+            Text(selected.label, maxLines = 1)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            CalculatorUnit.entries.forEach { unit ->
+                DropdownMenuItem(
+                    text = { Text(unit.label) },
+                    onClick = {
+                        onSelect(unit)
+                        expanded = false
+                    },
+                )
             }
-            FilterChip(
-                selected = selected == value,
-                onClick = { onSelect(value) },
-                label = { Text(label) },
-            )
+        }
+    }
+}
+
+@Composable
+private fun DirectionDropdownButton(
+    selected: CalculatorDirection,
+    onSelect: (CalculatorDirection) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.width(120.dp),
+        ) {
+            Text(selected.label, maxLines = 1)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            CalculatorDirection.entries.forEach { direction ->
+                DropdownMenuItem(
+                    text = { Text(direction.label) },
+                    onClick = {
+                        onSelect(direction)
+                        expanded = false
+                    },
+                )
+            }
         }
     }
 }

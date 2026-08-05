@@ -484,7 +484,7 @@ fun EventDetailScreen(
             text = { Text("此操作无法撤销。") },
             confirmButton = {
                 TextButton(onClick = onDelete) {
-                    Text("删除")
+                    Text("删除", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {

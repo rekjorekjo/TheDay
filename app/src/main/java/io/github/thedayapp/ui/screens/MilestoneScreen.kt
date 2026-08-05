@@ -4,10 +4,18 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,21 +30,25 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -47,6 +59,7 @@ import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -55,24 +68,32 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import io.github.thedayapp.data.DayEvent
 import io.github.thedayapp.data.DayMilestone
 import io.github.thedayapp.data.TheDayState
-import io.github.thedayapp.domain.DayMath
 import io.github.thedayapp.sharing.BatchExportRenderer
 import io.github.thedayapp.sharing.EventShareActions
 import io.github.thedayapp.sharing.MemoryImagePalette
@@ -84,6 +105,7 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.abs
@@ -91,6 +113,12 @@ import kotlin.math.abs
 private enum class MilestoneExportAction {
     SHARE,
     SAVE,
+}
+
+private enum class MilestoneStep {
+    LIST,
+    SORT,
+    SETTINGS,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,9 +132,34 @@ fun MilestoneScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val locale = Locale.getDefault()
     var showEditor by remember { mutableStateOf(false) }
+    var step by remember { mutableStateOf(MilestoneStep.LIST) }
+    var selectedTemplate by remember { mutableStateOf(MemoryImageTemplate.MINIMAL) }
+    var exportTitle by remember { mutableStateOf("里程碑") }
     var workingAction by remember { mutableStateOf<MilestoneExportAction?>(null) }
     var exportProgress by remember { mutableFloatStateOf(0f) }
+    val selectedIds = remember { mutableStateListOf<String>() }
+    val sortedSelectedIds = remember { mutableStateListOf<String>() }
+    var manageMode by remember { mutableStateOf(false) }
+    var highlightedId by remember { mutableStateOf<String?>(null) }
     val isWorking = workingAction != null
+    val selectionMode = manageMode
+
+    val milestoneById = remember(state.milestones) {
+        state.milestones.associateBy { milestone -> milestone.id }
+    }
+    val selectedMilestones = sortedSelectedIds.mapNotNull { id -> milestoneById[id] }
+
+    BackHandler(enabled = step != MilestoneStep.LIST || selectionMode) {
+        when (step) {
+            MilestoneStep.SETTINGS -> step = MilestoneStep.SORT
+            MilestoneStep.SORT -> step = MilestoneStep.LIST
+            MilestoneStep.LIST -> {
+                selectedIds.clear()
+                highlightedId = null
+                manageMode = false
+            }
+        }
+    }
 
     val colorScheme = MaterialTheme.colorScheme
     val memoryPalette = remember(colorScheme) {
@@ -123,12 +176,40 @@ fun MilestoneScreen(
         )
     }
 
-    fun milestoneEvents(): List<DayEvent> = state.milestones.map { milestone ->
+    fun openSort() {
+        if (selectedIds.isEmpty()) return
+        sortedSelectedIds.clear()
+        sortedSelectedIds.addAll(selectedIds)
+        step = MilestoneStep.SORT
+    }
+
+    fun deleteSelectedMilestones() {
+        selectedIds.toList().forEach { id -> state.deleteMilestone(id) }
+        selectedIds.clear()
+        sortedSelectedIds.clear()
+        highlightedId = null
+        manageMode = false
+        step = MilestoneStep.LIST
+    }
+
+    fun moveSortedMilestone(milestoneId: String, direction: Int): Boolean {
+        val fromIndex = sortedSelectedIds.indexOf(milestoneId)
+        if (fromIndex !in sortedSelectedIds.indices) return false
+
+        val toIndex = (fromIndex + direction).coerceIn(0, sortedSelectedIds.lastIndex)
+        if (fromIndex == toIndex) return false
+
+        val moved = sortedSelectedIds.removeAt(fromIndex)
+        sortedSelectedIds.add(toIndex, moved)
+        return true
+    }
+
+    fun milestoneEvents(): List<DayEvent> = selectedMilestones.map { milestone ->
         DayEvent(
             id = milestone.id,
             title = milestone.title,
             date = milestone.date,
-            category = "\u91cc\u7a0b\u7891",
+            category = "里程碑",
             note = milestone.note,
             createdAtEpochMillis = milestone.createdAtEpochMillis,
         )
@@ -141,8 +222,8 @@ fun MilestoneScreen(
             today = state.today,
             locale = locale,
             palette = memoryPalette,
-            template = MemoryImageTemplate.MINIMAL,
-            title = "\u91cc\u7a0b\u7891",
+            template = selectedTemplate,
+            title = exportTitle.trim().takeIf { it.isNotEmpty() } ?: "里程碑",
             onProgress = { fraction ->
                 withContext(Dispatchers.Main.immediate) {
                     exportProgress = 0.06f + fraction * 0.78f
@@ -158,7 +239,7 @@ fun MilestoneScreen(
     }
 
     fun exportMilestones(action: MilestoneExportAction) {
-        if (isWorking || state.milestones.isEmpty()) return
+        if (isWorking || selectedMilestones.isEmpty()) return
         scope.launch {
             workingAction = action
             exportProgress = 0.02f
@@ -166,7 +247,7 @@ fun MilestoneScreen(
             if (bitmaps == null) {
                 workingAction = null
                 exportProgress = 0f
-                snackbarHostState.showSnackbar("\u91cc\u7a0b\u7891\u5217\u8868\u751f\u6210\u5931\u8d25")
+                snackbarHostState.showSnackbar("里程碑列表生成失败")
                 return@launch
             }
             val result = if (action == MilestoneExportAction.SHARE) {
@@ -186,7 +267,7 @@ fun MilestoneScreen(
             recycleBitmaps(bitmaps)
             workingAction = null
             if (result.isFailure) {
-                snackbarHostState.showSnackbar("\u5bfc\u51fa\u5931\u8d25")
+                snackbarHostState.showSnackbar("导出失败")
             }
             exportProgress = 0f
         }
@@ -198,7 +279,7 @@ fun MilestoneScreen(
         if (granted) {
             exportMilestones(MilestoneExportAction.SAVE)
         } else {
-            scope.launch { snackbarHostState.showSnackbar("\u9700\u8981\u5b58\u50a8\u6743\u9650\u624d\u80fd\u4fdd\u5b58") }
+            scope.launch { snackbarHostState.showSnackbar("需要存储权限才能保存") }
         }
     }
 
@@ -218,78 +299,123 @@ fun MilestoneScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-                title = { Text("\u91cc\u7a0b\u7891") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "\u8fd4\u56de")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showEditor = true }) {
-                        Icon(Icons.Rounded.Add, contentDescription = "\u65b0\u589e\u91cc\u7a0b\u7891")
-                    }
-                },
-            )
+            when (step) {
+                MilestoneStep.LIST -> {
+                    TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
+                        title = { Text(if (selectionMode && selectedIds.isNotEmpty()) "已选 ${selectedIds.size}" else if (selectionMode) "选择里程碑" else "里程碑") },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = {
+                                    if (selectionMode) { selectedIds.clear(); highlightedId = null; manageMode = false } else onBack()
+                                },
+                            ) {
+                                Icon(Icons.Rounded.ArrowBack, contentDescription = "返回")
+                            }
+                        },
+                        actions = {
+                            if (!selectionMode) {
+                                IconButton(onClick = { showEditor = true }) {
+                                    Icon(Icons.Rounded.Add, contentDescription = "新增里程碑")
+                                }
+                            }
+                        },
+                    )
+                }
+
+                MilestoneStep.SORT -> {
+                    TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
+                        title = { Text("调整顺序") },
+                        navigationIcon = {
+                            IconButton(onClick = { step = MilestoneStep.LIST }) {
+                                Icon(Icons.Rounded.ArrowBack, contentDescription = "返回")
+                            }
+                        },
+                        actions = {
+                            TextButton(onClick = { step = MilestoneStep.SETTINGS }) {
+                                Text("确认")
+                            }
+                        },
+                    )
+                }
+
+                MilestoneStep.SETTINGS -> {
+                    TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
+                        title = { Text("导出里程碑") },
+                        navigationIcon = {
+                            IconButton(onClick = { step = MilestoneStep.SORT }) {
+                                Icon(Icons.Rounded.ArrowBack, contentDescription = "返回")
+                            }
+                        },
+                    )
+                }
+            }
         },
     ) { contentPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding)
-                .padding(horizontal = 18.dp),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item { Spacer(Modifier.height(4.dp)) }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    ProgressCard(
-                        modifier = Modifier.weight(1f),
-                        title = "\u4eca\u5e74",
-                        progress = state.today.dayOfYear.toFloat() / state.today.lengthOfYear().toFloat(),
-                    )
-                    ProgressCard(
-                        modifier = Modifier.weight(1f),
-                        title = "\u672c\u6708",
-                        progress = state.today.dayOfMonth.toFloat() / state.today.lengthOfMonth().toFloat(),
-                    )
-                }
-            }
-            if (state.milestones.isEmpty()) {
-                item {
-                    Text(
-                        text = "\u8fd8\u6ca1\u6709\u91cc\u7a0b\u7891",
-                        modifier = Modifier.padding(vertical = 22.dp),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                items(state.milestones, key = { it.id }) { milestone ->
-                    MilestoneCard(
-                        milestone = milestone,
-                        today = state.today,
-                        locale = locale,
-                        onDelete = { state.deleteMilestone(milestone.id) },
-                    )
-                }
-            }
-            item {
-                ExportMilestoneActions(
-                    enabled = state.milestones.isNotEmpty(),
-                    workingAction = workingAction,
-                    progress = exportProgress,
-                    onShare = { exportMilestones(MilestoneExportAction.SHARE) },
-                    onSave = ::requestSave,
-                )
-            }
+        when (step) {
+            MilestoneStep.LIST -> MilestoneListPage(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
+                milestones = state.milestones,
+                today = state.today,
+                locale = locale,
+                selectedIds = selectedIds,
+                highlightedId = highlightedId,
+                selectionMode = selectionMode,
+                onToggleSelection = { milestoneId ->
+                    if (milestoneId in selectedIds) {
+                        selectedIds.remove(milestoneId)
+                    } else {
+                        selectedIds.add(milestoneId)
+                    }
+                },
+                onStartSelection = { milestoneId ->
+                    highlightedId = milestoneId
+                    manageMode = true
+                },
+                onMove = state::moveMilestone,
+                onExportSelected = ::openSort,
+                onDeleteSelected = ::deleteSelectedMilestones,
+                onDoneSelection = {
+                    selectedIds.clear()
+                    highlightedId = null
+                    manageMode = false
+                },
+            )
+
+            MilestoneStep.SORT -> MilestoneSortPage(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
+                milestones = selectedMilestones,
+                today = state.today,
+                locale = locale,
+                onMove = ::moveSortedMilestone,
+            )
+
+            MilestoneStep.SETTINGS -> MilestoneExportSettingsPage(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
+                selectedCount = selectedMilestones.size,
+                exportTitle = exportTitle,
+                onExportTitleChange = { exportTitle = it },
+                selectedTemplate = selectedTemplate,
+                onTemplateSelected = { selectedTemplate = it },
+                workingAction = workingAction,
+                exportProgress = exportProgress,
+                onShare = { exportMilestones(MilestoneExportAction.SHARE) },
+                onSave = ::requestSave,
+            )
         }
     }
 
@@ -313,6 +439,184 @@ fun MilestoneScreen(
 }
 
 @Composable
+private fun MilestoneListPage(
+    modifier: Modifier,
+    milestones: List<DayMilestone>,
+    today: LocalDate,
+    locale: Locale,
+    selectedIds: List<String>,
+    highlightedId: String?,
+    selectionMode: Boolean,
+    onToggleSelection: (String) -> Unit,
+    onStartSelection: (String) -> Unit,
+    onMove: (String, Int) -> Boolean,
+    onExportSelected: () -> Unit,
+    onDeleteSelected: () -> Unit,
+    onDoneSelection: () -> Unit,
+) {
+    val itemHeights = remember { mutableStateMapOf<String, Int>() }
+    val density = LocalDensity.current
+    val itemGapPx = with(density) { 12.dp.toPx() }
+    var draggedId by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val currentMilestones by rememberUpdatedState(milestones)
+    val currentOnMove by rememberUpdatedState(onMove)
+
+    Box(modifier = modifier) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 18.dp),
+            contentPadding = PaddingValues(bottom = if (selectionMode) 116.dp else 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item { Spacer(Modifier.height(4.dp)) }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ProgressCard(
+                        modifier = Modifier.weight(1f),
+                        title = "${today.year}年",
+                        progress = today.dayOfYear.toFloat() / today.lengthOfYear().toFloat(),
+                    )
+                    ProgressCard(
+                        modifier = Modifier.weight(1f),
+                        title = "${today.monthValue}月",
+                        progress = today.dayOfMonth.toFloat() / today.lengthOfMonth().toFloat(),
+                    )
+                }
+            }
+            if (milestones.isEmpty()) {
+                item {
+                    Text(
+                        text = "还没有里程碑",
+                        modifier = Modifier.padding(vertical = 22.dp),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                items(milestones, key = { it.id }) { milestone ->
+                    val selected = milestone.id in selectedIds
+                    val highlighted = milestone.id == highlightedId
+                    val isDragging = draggedId == milestone.id
+                    val itemHeight = itemHeights[milestone.id]?.toFloat() ?: 1f
+                    val dragModifier = (if (isDragging || selectionMode) {
+                        Modifier
+                    } else {
+                        Modifier.animateItem(
+                            fadeInSpec = null,
+                            placementSpec = spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMediumLow,
+                            ),
+                            fadeOutSpec = null,
+                        )
+                    })
+                        .zIndex(if (isDragging) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = if (isDragging) dragOffset else 0f
+                        }
+                        .onSizeChanged { size ->
+                            itemHeights[milestone.id] = size.height
+                        }
+                        .then(
+                            if (selectionMode) {
+                                Modifier
+                            } else {
+                                Modifier.pointerInput(milestone.id) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            draggedId = milestone.id
+                                            dragOffset = 0f
+                                        },
+                                        onDragCancel = {
+                                            draggedId = null
+                                            dragOffset = 0f
+                                        },
+                                        onDragEnd = {
+                                            draggedId = null
+                                            dragOffset = 0f
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragOffset += dragAmount.y
+
+                                            val latestMilestones = currentMilestones
+                                            val currentIndex = latestMilestones.indexOfFirst {
+                                                it.id == milestone.id
+                                            }
+
+                                            when {
+                                                dragOffset > 0f -> {
+                                                    val adjacent = latestMilestones.getOrNull(currentIndex + 1)
+                                                    val adjacentHeight = adjacent
+                                                        ?.let { itemHeights[it.id] }
+                                                        ?.toFloat()
+                                                        ?: itemHeight
+                                                    val threshold = adjacentHeight * 0.50f
+                                                    if (
+                                                        dragOffset > threshold &&
+                                                        currentOnMove(milestone.id, 1)
+                                                    ) {
+                                                        dragOffset -= adjacentHeight + itemGapPx
+                                                    }
+                                                }
+
+                                                dragOffset < 0f -> {
+                                                    val adjacent = latestMilestones.getOrNull(currentIndex - 1)
+                                                    val adjacentHeight = adjacent
+                                                        ?.let { itemHeights[it.id] }
+                                                        ?.toFloat()
+                                                        ?: itemHeight
+                                                    val threshold = adjacentHeight * 0.50f
+                                                    if (
+                                                        dragOffset < -threshold &&
+                                                        currentOnMove(milestone.id, -1)
+                                                    ) {
+                                                        dragOffset += adjacentHeight + itemGapPx
+                                                    }
+                                                }
+                                            }
+                                        },
+                                    )
+                                }
+                            },
+                        )
+
+                    MilestoneCard(
+                        milestone = milestone,
+                        today = today,
+                        locale = locale,
+                        selected = selected,
+                        highlighted = highlighted,
+                        selectionMode = selectionMode,
+                        onClick = {
+                            if (selectionMode) onToggleSelection(milestone.id)
+                        },
+                        onLongClick = { onStartSelection(milestone.id) },
+                        modifier = dragModifier,
+                    )
+                }
+            }
+        }
+
+        if (selectionMode) {
+            MilestoneSelectionToolbar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                hasSelection = selectedIds.isNotEmpty(),
+                onExport = onExportSelected,
+                onDelete = onDeleteSelected,
+                onDone = onDoneSelection,
+            )
+        }
+    }
+}
+@Composable
 private fun ProgressCard(
     modifier: Modifier,
     title: String,
@@ -324,7 +628,7 @@ private fun ProgressCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
@@ -350,18 +654,37 @@ private fun ProgressCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MilestoneCard(
     milestone: DayMilestone,
     today: LocalDate,
     locale: Locale,
-    onDelete: () -> Unit,
+    selected: Boolean,
+    highlighted: Boolean,
+    selectionMode: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val delta = java.time.temporal.ChronoUnit.DAYS.between(today, milestone.date)
+    val delta = ChronoUnit.DAYS.between(today, milestone.date)
+    val containerColor by animateColorAsState(
+        targetValue = if (selected || highlighted) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.68f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        label = "milestoneSelectionColor",
+    )
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -399,51 +722,405 @@ private fun MilestoneCard(
                 }
             }
             Text(
-                text = when {
-                    delta > 0L -> "\u8fd8\u6709 ${abs(delta)} \u5929"
-                    delta < 0L -> "\u5df2\u7ecf ${abs(delta)} \u5929"
-                    else -> "\u4eca\u5929"
-                },
+                text = relativeMilestoneText(delta),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
             )
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Rounded.Delete, contentDescription = "\u5220\u9664")
+            if (selectionMode) {
+                Spacer(Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier
+                        .size(25.dp)
+                        .background(
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                            },
+                            shape = CircleShape,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = "已选择",
+                            modifier = Modifier.size(17.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ExportMilestoneActions(
-    enabled: Boolean,
+private fun MilestoneSelectionToolbar(
+    modifier: Modifier,
+    hasSelection: Boolean,
+    onExport: () -> Unit,
+    onDelete: () -> Unit,
+    onDone: () -> Unit,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 4.dp,
+        shadowElevation = 8.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Button(
+                onClick = onDelete,
+                enabled = hasSelection,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+                Icon(Icons.Rounded.Delete, contentDescription = "删除")
+            }
+            Button(
+                onClick = onExport,
+                enabled = hasSelection,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+            ) {
+                Icon(Icons.Rounded.IosShare, contentDescription = "导出")
+            }
+            OutlinedButton(
+                onClick = onDone,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+            ) {
+                Icon(Icons.Rounded.Check, contentDescription = "完成")
+            }
+        }
+    }
+}
+@Composable
+private fun MilestoneSortPage(
+    modifier: Modifier,
+    milestones: List<DayMilestone>,
+    today: LocalDate,
+    locale: Locale,
+    onMove: (String, Int) -> Boolean,
+) {
+    val itemHeights = remember { mutableStateMapOf<String, Int>() }
+    val density = LocalDensity.current
+    val itemGapPx = with(density) { 10.dp.toPx() }
+    var draggedId by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val currentMilestones by rememberUpdatedState(milestones)
+    val currentOnMove by rememberUpdatedState(onMove)
+
+    Column(
+        modifier = modifier.padding(horizontal = 18.dp),
+    ) {
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "长按卡片后上下拖动",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "总数：${milestones.size}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(bottom = 18.dp),
+        ) {
+            items(
+                items = milestones,
+                key = { milestone -> milestone.id },
+            ) { milestone ->
+                val isDragging = draggedId == milestone.id
+                val itemHeight = itemHeights[milestone.id]?.toFloat() ?: 1f
+
+                MilestoneSortRow(
+                    milestone = milestone,
+                    today = today,
+                    locale = locale,
+                    isDragging = isDragging,
+                    modifier = (if (isDragging) {
+                        Modifier
+                    } else {
+                        Modifier.animateItem(
+                            fadeInSpec = null,
+                            placementSpec = spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMediumLow,
+                            ),
+                            fadeOutSpec = null,
+                        )
+                    })
+                        .zIndex(if (isDragging) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = if (isDragging) dragOffset else 0f
+                        }
+                        .onSizeChanged { size ->
+                            itemHeights[milestone.id] = size.height
+                        }
+                        .pointerInput(milestone.id) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    draggedId = milestone.id
+                                    dragOffset = 0f
+                                },
+                                onDragCancel = {
+                                    draggedId = null
+                                    dragOffset = 0f
+                                },
+                                onDragEnd = {
+                                    draggedId = null
+                                    dragOffset = 0f
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    dragOffset += dragAmount.y
+
+                                    val latestMilestones = currentMilestones
+                                    val currentIndex = latestMilestones.indexOfFirst {
+                                        it.id == milestone.id
+                                    }
+
+                                    when {
+                                        dragOffset > 0f -> {
+                                            val adjacent = latestMilestones.getOrNull(currentIndex + 1)
+                                            val adjacentHeight = adjacent
+                                                ?.let { itemHeights[it.id] }
+                                                ?.toFloat()
+                                                ?: itemHeight
+                                            val threshold = adjacentHeight * 0.50f
+                                            if (
+                                                dragOffset > threshold &&
+                                                currentOnMove(milestone.id, 1)
+                                            ) {
+                                                dragOffset -= adjacentHeight + itemGapPx
+                                            }
+                                        }
+
+                                        dragOffset < 0f -> {
+                                            val adjacent = latestMilestones.getOrNull(currentIndex - 1)
+                                            val adjacentHeight = adjacent
+                                                ?.let { itemHeights[it.id] }
+                                                ?.toFloat()
+                                                ?: itemHeight
+                                            val threshold = adjacentHeight * 0.50f
+                                            if (
+                                                dragOffset < -threshold &&
+                                                currentOnMove(milestone.id, -1)
+                                            ) {
+                                                dragOffset += adjacentHeight + itemGapPx
+                                            }
+                                        }
+                                    }
+                                },
+                            )
+                        },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MilestoneSortRow(
+    milestone: DayMilestone,
+    today: LocalDate,
+    locale: Locale,
+    isDragging: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val delta = ChronoUnit.DAYS.between(today, milestone.date)
+    val containerColor by animateColorAsState(
+        targetValue = if (isDragging) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "milestoneSortHighlight",
+    )
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = milestone.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = DateFormatting.compactDate(milestone.date, locale),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = relativeMilestoneText(delta),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        }
+    }
+}
+@Composable
+private fun MilestoneExportSettingsPage(
+    modifier: Modifier,
+    selectedCount: Int,
+    exportTitle: String,
+    onExportTitleChange: (String) -> Unit,
+    selectedTemplate: MemoryImageTemplate,
+    onTemplateSelected: (MemoryImageTemplate) -> Unit,
     workingAction: MilestoneExportAction?,
-    progress: Float,
+    exportProgress: Float,
     onShare: () -> Unit,
     onSave: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    LazyColumn(
+        modifier = modifier.padding(horizontal = 18.dp),
+        contentPadding = PaddingValues(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        OutlinedButton(
-            onClick = onShare,
-            enabled = enabled && (workingAction == null || workingAction == MilestoneExportAction.SHARE),
-            modifier = Modifier
-                .weight(1f)
-                .height(72.dp),
-        ) {
-            MilestoneExportContent(Icons.Rounded.IosShare, "\u5206\u4eab", workingAction == MilestoneExportAction.SHARE, progress)
+        item { Spacer(Modifier.height(4.dp)) }
+        item {
+            OutlinedTextField(
+                value = exportTitle,
+                onValueChange = onExportTitleChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("标题") },
+                singleLine = true,
+            )
         }
-        Button(
-            onClick = onSave,
-            enabled = enabled && (workingAction == null || workingAction == MilestoneExportAction.SAVE),
-            modifier = Modifier
-                .weight(1f)
-                .height(72.dp),
-        ) {
-            MilestoneExportContent(Icons.Rounded.DoneAll, "\u4fdd\u5b58\u5230\u76f8\u518c", workingAction == MilestoneExportAction.SAVE, progress)
+        item {
+            Text(
+                text = "装饰主题",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        item {
+            val templateRows = MemoryImageTemplate.values().toList().chunked(3)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                templateRows.forEach { rowTemplates ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        rowTemplates.forEach { template ->
+                            FilterChip(
+                                selected = selectedTemplate == template,
+                                onClick = { onTemplateSelected(template) },
+                                label = {
+                                    Text(
+                                        text = templateLabel(template),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                    )
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(56.dp),
+                            )
+                        }
+                        repeat(3 - rowTemplates.size) {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Text(
+                text = "已选择 $selectedCount 个里程碑",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onShare,
+                    enabled = selectedCount > 0 &&
+                        (workingAction == null || workingAction == MilestoneExportAction.SHARE),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(72.dp),
+                ) {
+                    MilestoneExportContent(
+                        Icons.Rounded.IosShare,
+                        "分享",
+                        workingAction == MilestoneExportAction.SHARE,
+                        exportProgress,
+                    )
+                }
+                Button(
+                    onClick = onSave,
+                    enabled = selectedCount > 0 &&
+                        (workingAction == null || workingAction == MilestoneExportAction.SAVE),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(72.dp),
+                ) {
+                    MilestoneExportContent(
+                        Icons.Rounded.DoneAll,
+                        "保存到相册",
+                        workingAction == MilestoneExportAction.SAVE,
+                        exportProgress,
+                    )
+                }
+            }
         }
     }
 }
@@ -455,13 +1132,18 @@ private fun MilestoneExportContent(
     active: Boolean,
     progress: Float,
 ) {
+    val animatedProgress by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
+        label = "milestoneExportProgress",
+    )
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         if (active) {
             CircularProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
+                progress = { animatedProgress },
                 modifier = Modifier.size(18.dp),
                 strokeWidth = 2.dp,
             )
@@ -469,7 +1151,7 @@ private fun MilestoneExportContent(
             Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
         }
         Spacer(Modifier.width(6.dp))
-        Text(if (active) "\u751f\u6210\u4e2d" else text, maxLines = 1)
+        Text(if (active) "生成中" else text, maxLines = 1)
     }
 }
 
@@ -487,13 +1169,13 @@ private fun MilestoneEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("\u65b0\u589e\u91cc\u7a0b\u7891") },
+        title = { Text("新增里程碑") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it.take(60) },
-                    label = { Text("\u540d\u79f0") },
+                    label = { Text("名称") },
                     singleLine = true,
                 )
                 Card(
@@ -505,14 +1187,14 @@ private fun MilestoneEditorDialog(
                     ),
                 ) {
                     Column(Modifier.padding(14.dp)) {
-                        Text("\u65e5\u671f", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("日期", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(DateFormatting.longDate(date, Locale.getDefault()), style = MaterialTheme.typography.titleMedium)
                     }
                 }
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it.take(160) },
-                    label = { Text("\u5907\u6ce8") },
+                    label = { Text("备注") },
                     minLines = 2,
                 )
             }
@@ -522,11 +1204,11 @@ private fun MilestoneEditorDialog(
                 onClick = { onSave(title.trim(), date, note.trim()) },
                 enabled = title.isNotBlank(),
             ) {
-                Text("\u4fdd\u5b58")
+                Text("保存")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("\u53d6\u6d88") }
+            TextButton(onClick = onDismiss) { Text("取消") }
         },
     )
 
@@ -544,13 +1226,31 @@ private fun MilestoneEditorDialog(
                         }
                         showDatePicker = false
                     },
-                ) { Text("\u786e\u5b9a") }
+                ) { Text("确定") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("\u53d6\u6d88") }
+                TextButton(onClick = { showDatePicker = false }) { Text("取消") }
             },
         ) {
             DatePicker(state = pickerState)
         }
+    }
+}
+
+private fun relativeMilestoneText(delta: Long): String {
+    return when {
+        delta > 0L -> "还有 ${abs(delta)} 天"
+        delta < 0L -> "已经 ${abs(delta)} 天"
+        else -> "今天"
+    }
+}
+private fun templateLabel(template: MemoryImageTemplate): String {
+    return when (template) {
+        MemoryImageTemplate.CIRCLES -> "圆圈"
+        MemoryImageTemplate.STARS -> "星星"
+        MemoryImageTemplate.HEARTS -> "爱心"
+        MemoryImageTemplate.METEORS -> "流星"
+        MemoryImageTemplate.WAVES -> "波浪"
+        MemoryImageTemplate.MINIMAL -> "极简"
     }
 }
