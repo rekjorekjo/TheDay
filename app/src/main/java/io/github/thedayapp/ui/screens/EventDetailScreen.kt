@@ -72,6 +72,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.thedayapp.ui.currentJavaLocale
 import io.github.thedayapp.WidgetPinActivity
 import io.github.thedayapp.data.DayEvent
 import io.github.thedayapp.data.ImagePlacementTarget
@@ -105,7 +106,7 @@ fun EventDetailScreen(
     onImageTransformChange: (ImageTransform) -> Unit,
 ) {
     val context = LocalContext.current
-    val locale = Locale.getDefault()
+    val locale = currentJavaLocale()
     val delta = DayMath.signedDays(event, today)
     val displayDate = DayMath.effectiveDate(event, today)
     val scope = rememberCoroutineScope()

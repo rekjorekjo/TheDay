@@ -1,0 +1,26 @@
+name: glass_flutter
+description: The Day Glass UI module.
+publish_to: none
+version: 3.0.0+43
+
+environment:
+  sdk: '>=3.9.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/app_icon.png
+  module:
+    androidX: true
+    androidPackage: io.github.thedayapp.glassflutter
+    iosBundleIdentifier: io.github.thedayapp.glassflutter

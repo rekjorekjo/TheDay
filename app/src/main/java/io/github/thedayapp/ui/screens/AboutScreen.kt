@@ -179,7 +179,9 @@ private fun UpdateSection() {
     val preferences = remember { UpdatePreferences(context) }
 
     var isChecking by remember { mutableStateOf(false) }
+    var isCheckingGlass by remember { mutableStateOf(false) }
     var checkMessage by remember { mutableStateOf<String?>(null) }
+    var glassUpgradeMessage by remember { mutableStateOf<String?>(null) }
     var wifiOnly by remember { mutableStateOf(preferences.wifiOnly) }
     var downloadStatus by remember { mutableStateOf(updateManager.currentStatus()) }
     var isVerifyingLocally by remember { mutableStateOf(false) }
@@ -290,6 +292,77 @@ private fun UpdateSection() {
     }
 
     HorizontalDivider(modifier = Modifier.padding(horizontal = 18.dp))
+
+    if (BuildConfig.EDITION == "classic") {
+        val glassDownloadPending = preferences.pendingAssetName?.startsWith("TheDay-Glass-") == true
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 58.dp)
+                .clickable(enabled = !isCheckingGlass && !downloadBusy) {
+                    if (downloadStatus.state == UpdateDownloadState.READY && glassDownloadPending) {
+                        context.findActivity()?.let(updateManager::requestInstall)
+                    } else {
+                        coroutineScope.launch {
+                            isCheckingGlass = true
+                            glassUpgradeMessage = null
+                            try {
+                                when (val result = updateManager.checkForGlassUpgrade()) {
+                                    is UpdateCheckResult.UpdateAvailable -> {
+                                        val started = updateManager.startDownload(result.release)
+                                        glassUpgradeMessage = if (started) {
+                                            context.getString(R.string.glass_upgrade_downloading)
+                                        } else {
+                                            context.getString(R.string.update_download_failed)
+                                        }
+                                    }
+                                    UpdateCheckResult.UpToDate -> {
+                                        glassUpgradeMessage = context.getString(R.string.glass_upgrade_unavailable)
+                                    }
+                                    UpdateCheckResult.CheckFailed -> {
+                                        glassUpgradeMessage = context.getString(R.string.update_failed)
+                                    }
+                                }
+                                downloadStatus = updateManager.currentStatus()
+                            } finally {
+                                isCheckingGlass = false
+                            }
+                        }
+                    }
+                }
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.glass_upgrade_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.glass_upgrade_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = when {
+                    isCheckingGlass -> stringResource(R.string.update_checking)
+                    glassDownloadPending -> getStatusText(
+                        isChecking = false,
+                        downloadStatus = downloadStatus,
+                        checkMessage = glassUpgradeMessage,
+                        context = context,
+                    )
+                    glassUpgradeMessage != null -> glassUpgradeMessage!!
+                    else -> ""
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 18.dp))
+    }
 
     // Wi-Fi 行
     Row(

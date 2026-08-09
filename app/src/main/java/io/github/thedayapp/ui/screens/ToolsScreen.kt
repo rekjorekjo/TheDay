@@ -12,10 +12,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.IosShare
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,6 +40,7 @@ fun ToolsScreen(
     bottomBar: @Composable () -> Unit,
     onBack: () -> Unit,
     onOpenExport: () -> Unit,
+    onOpenAlbums: () -> Unit,
     onOpenMilestones: () -> Unit,
     onOpenCalculator: () -> Unit,
 ) {
@@ -51,7 +53,7 @@ fun ToolsScreen(
                 title = { Text("工具栏") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
                     }
                 },
             )
@@ -85,6 +87,13 @@ fun ToolsScreen(
                     title = "计算器",
                     icon = Icons.Rounded.Calculate,
                     onClick = onOpenCalculator,
+                )
+            }
+            item {
+                ToolCard(
+                    title = "纪念册",
+                    icon = Icons.AutoMirrored.Rounded.MenuBook,
+                    onClick = onOpenAlbums,
                 )
             }
             item { Spacer(Modifier.height(18.dp)) }

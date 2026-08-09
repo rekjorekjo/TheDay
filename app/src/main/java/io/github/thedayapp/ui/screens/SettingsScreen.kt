@@ -469,38 +469,54 @@ private fun PaletteColorTile(
     onClick: () -> Unit,
 ) {
     val color = palettePreviewColor(style)
-    val borderColor = if (selected) {
-        MaterialTheme.colorScheme.onSurface
+    val glowPadding = if (selected) 4.dp else 0.dp
+    val glowColor = if (selected) {
+        color.copy(alpha = 0.36f)
     } else {
-        Color.White.copy(alpha = 0.34f)
+        Color.Transparent
     }
 
     Box(
         modifier = Modifier
             .size(width = width, height = height)
             .clip(PaletteTileShape)
-            .background(color)
-            .border(
-                width = if (selected) 3.dp else 1.dp,
-                color = borderColor,
-                shape = PaletteTileShape,
-            )
+            .background(glowColor)
             .clickable(onClick = onClick)
             .semantics {
                 contentDescription = "\u4e3b\u9898\u914d\u8272\uff1a${paletteName(style)}"
             }
-            .padding(horizontal = 6.dp),
+            .padding(glowPadding),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = paletteName(style),
-            color = Color.White,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Clip,
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(PaletteTileShape)
+                .background(color)
+                .then(
+                    if (selected) {
+                        Modifier.background(Color.White.copy(alpha = 0.18f))
+                    } else {
+                        Modifier.border(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.34f),
+                            shape = PaletteTileShape,
+                        )
+                    },
+                )
+                .padding(horizontal = 6.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = paletteName(style),
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+            )
+        }
     }
 }
 

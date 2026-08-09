@@ -42,16 +42,64 @@ val appVersionName =
                 "versionName must use X.Y.Z",
         )
 
+val signingPropertiesFile = rootProject.file("keystore.properties")
+val signingProperties = Properties()
+val hasReleaseSigning = signingPropertiesFile.isFile
+
+if (hasReleaseSigning) {
+    signingPropertiesFile.inputStream().use { input ->
+        signingProperties.load(input)
+    }
+}
+
+fun requiredSigningProperty(name: String): String =
+    signingProperties
+        .getProperty(name)
+        ?.takeIf { it.isNotBlank() }
+        ?: error("keystore.properties: missing $name")
+
 android {
     namespace = "io.github.thedayapp"
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(requiredSigningProperty("storeFile"))
+                storePassword = requiredSigningProperty("storePassword")
+                keyAlias = requiredSigningProperty("keyAlias")
+                keyPassword = requiredSigningProperty("keyPassword")
+            }
+        }
+    }
     compileSdk = 36
 
     defaultConfig {
         applicationId = "io.github.thedayapp"
-        minSdk = 26
+        minSdk = 31
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
+    }
+
+    flavorDimensions += "experience"
+    productFlavors {
+        create("classic") {
+            dimension = "experience"
+            buildConfigField("String", "EDITION", "\"classic\"")
+        }
+        create("glass") {
+            dimension = "experience"
+            // Glass intentionally shares the Classic application id. Installing a
+            // Glass APK signed with the same release key replaces Classic in-place
+            // and keeps the existing app-private events, images, settings and widgets.
+            buildConfigField("String", "EDITION", "\"glass\"")
+            // Flutter ships Android native runtime libraries for these ABIs.
+            // Keep the restriction on the Glass flavor only so Classic remains
+            // unaffected by the Flutter embedding.
+            ndk {
+                abiFilters += setOf("armeabi-v7a", "arm64-v8a", "x86_64")
+            }
+        }
     }
 
     buildFeatures {
@@ -72,6 +120,9 @@ android {
 
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -101,6 +152,10 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.github.yalantis:ucrop:2.2.11")
+
+    // Flutter is packaged only into the Glass flavor. Classic stays on the
+    // existing Compose stack and does not pull the Flutter engine into its APK.
+    add("glassImplementation", project(":flutter"))
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import io.github.thedayapp.ui.currentJavaLocale
 import io.github.thedayapp.util.DateFormatting
 import java.time.Instant
 import java.time.LocalDate
@@ -79,7 +80,7 @@ fun DateCalculatorScreen(
     today: LocalDate,
     onBack: () -> Unit,
 ) {
-    val locale = Locale.getDefault()
+    val locale = currentJavaLocale()
     var offsetStart by remember { mutableStateOf(today) }
     var amountText by remember { mutableStateOf("") }
     var amountUnit by remember { mutableStateOf(CalculatorUnit.DAYS) }

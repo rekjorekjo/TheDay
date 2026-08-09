@@ -110,6 +110,14 @@ data class NewEventDraft(
     val backgroundImage: LocalImageReference? = null,
 )
 
+data class DayAlbum(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val eventIds: List<String>,
+    val coverEventId: String? = null,
+    val createdAtEpochMillis: Long = System.currentTimeMillis(),
+    val updatedAtEpochMillis: Long = System.currentTimeMillis(),
+)
 data class DayMilestone(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
@@ -134,6 +142,10 @@ data class DayEvent(
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val paletteStyle: PaletteStyle = PaletteStyle.MIDNIGHT,
+    val glassClarity: Int = 62,
+    val backgroundMotionMode: String = "FLOW",
+    val backgroundTexture: String = "DIAGONAL",
+    val dynamicEdgeReflection: Boolean = true,
     val sortMode: SortMode = SortMode.SMART,
     val sortDirection: SortDirection = SortDirection.ASCENDING,
     val showPastEvents: Boolean = true,

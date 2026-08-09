@@ -64,6 +64,7 @@ object BatchExportRenderer {
         palette: MemoryImagePalette,
         template: MemoryImageTemplate,
         title: String?,
+        glassStyle: GlassExportStyle? = null,
         onProgress: suspend (Float) -> Unit = {},
     ): Result<List<Bitmap>> {
         return renderPages(
@@ -74,6 +75,7 @@ object BatchExportRenderer {
             palette = palette,
             template = template,
             title = title,
+            glassStyle = glassStyle,
             kind = ExportPageKind.LONG_IMAGE,
             onProgress = onProgress,
         )
@@ -87,6 +89,7 @@ object BatchExportRenderer {
         palette: MemoryImagePalette,
         template: MemoryImageTemplate,
         title: String?,
+        glassStyle: GlassExportStyle? = null,
         onProgress: suspend (Float) -> Unit = {},
     ): Result<List<Bitmap>> {
         return renderPages(
@@ -97,6 +100,7 @@ object BatchExportRenderer {
             palette = palette,
             template = template,
             title = title,
+            glassStyle = glassStyle,
             kind = ExportPageKind.LIST,
             onProgress = onProgress,
         )
@@ -110,6 +114,7 @@ object BatchExportRenderer {
         palette: MemoryImagePalette,
         template: MemoryImageTemplate,
         title: String?,
+        glassStyle: GlassExportStyle?,
         kind: ExportPageKind,
         onProgress: suspend (Float) -> Unit,
     ): Result<List<Bitmap>> {
@@ -142,6 +147,7 @@ object BatchExportRenderer {
                         template = template,
                         seed = (events.hashCode() * 31 + index * 17).toLong(),
                         kind = kind,
+                        glassStyle = glassStyle,
                     )
                     drawPageHeader(
                         canvas = canvas,
@@ -160,6 +166,7 @@ object BatchExportRenderer {
                             today = today,
                             locale = locale,
                             palette = palette,
+                            glassStyle = glassStyle,
                         )
 
                         ExportPageKind.LIST -> drawListPageContent(
@@ -169,6 +176,7 @@ object BatchExportRenderer {
                             today = today,
                             locale = locale,
                             palette = palette,
+                            glassStyle = glassStyle,
                         )
                     }
 
@@ -317,7 +325,13 @@ object BatchExportRenderer {
         template: MemoryImageTemplate,
         seed: Long,
         kind: ExportPageKind,
+        glassStyle: GlassExportStyle?,
     ) {
+        if (glassStyle != null) {
+            drawGlassPageBackground(canvas, pageHeight, glassStyle)
+            return
+        }
+
         val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 0f,
@@ -337,6 +351,18 @@ object BatchExportRenderer {
             seed = seed,
             dense = kind == ExportPageKind.LONG_IMAGE,
             pageHeight = pageHeight,
+        )
+    }
+
+    private fun drawGlassPageBackground(
+        canvas: Canvas,
+        pageHeight: Int,
+        style: GlassExportStyle,
+    ) {
+        GlassExportBackdrop.draw(
+            canvas,
+            RectF(0f, 0f, PAGE_WIDTH.toFloat(), pageHeight.toFloat()),
+            style,
         )
     }
 
@@ -428,6 +454,7 @@ object BatchExportRenderer {
         today: LocalDate,
         locale: Locale,
         palette: MemoryImagePalette,
+        glassStyle: GlassExportStyle?,
     ) {
         if (pageEvents.isEmpty()) {
             val emptyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -455,6 +482,7 @@ object BatchExportRenderer {
                 today = today,
                 locale = locale,
                 palette = palette,
+                glassStyle = glassStyle,
             )
             top = rect.bottom + CONTENT_GAP
         }
@@ -468,16 +496,17 @@ object BatchExportRenderer {
         today: LocalDate,
         locale: Locale,
         palette: MemoryImagePalette,
+        glassStyle: GlassExportStyle?,
     ) {
         val rounding = 42f
         val cardPath = Path().apply {
             addRoundRect(rect, rounding, rounding, Path.Direction.CW)
         }
         val cardSurfacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (event.backgroundImage == null) {
-                withAlpha(palette.surface, if (palette.isDark) 74 else 38)
-            } else {
-                withAlpha(palette.surface, if (palette.isDark) 28 else 18)
+            color = when {
+                event.backgroundImage != null -> withAlpha(palette.surface, if (palette.isDark) 28 else 18)
+                glassStyle != null -> Color.TRANSPARENT
+                else -> withAlpha(palette.surface, if (palette.isDark) 74 else 38)
             }
         }
         canvas.drawPath(cardPath, cardSurfacePaint)
@@ -511,6 +540,17 @@ object BatchExportRenderer {
             }
             canvas.drawRect(rect, gradientPaint)
             canvas.restoreToCount(saveCount)
+        } else if (glassStyle != null) {
+            val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = withAlpha(Color.WHITE, glassStyle.surfaceFillAlpha)
+            }
+            canvas.drawPath(cardPath, glassPaint)
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = withAlpha(Color.WHITE, glassStyle.borderAlpha)
+                style = Paint.Style.STROKE
+                strokeWidth = 2.2f
+            }
+            canvas.drawPath(cardPath, borderPaint)
         } else {
             val emptyBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = LinearGradient(
@@ -661,6 +701,7 @@ object BatchExportRenderer {
         today: LocalDate,
         locale: Locale,
         palette: MemoryImagePalette,
+        glassStyle: GlassExportStyle?,
     ) {
         if (pageEvents.isEmpty()) {
             val emptyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -680,7 +721,7 @@ object BatchExportRenderer {
                 PAGE_WIDTH - OUTER_MARGIN,
                 top + LIST_ROW_HEIGHT,
             )
-            drawListRow(canvas, rect, event, today, locale, palette)
+            drawListRow(canvas, rect, event, today, locale, palette, glassStyle)
             top = rect.bottom + LIST_ROW_GAP
         }
     }
@@ -692,11 +733,24 @@ object BatchExportRenderer {
         today: LocalDate,
         locale: Locale,
         palette: MemoryImagePalette,
+        glassStyle: GlassExportStyle?,
     ) {
         val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = withAlpha(palette.surface, if (palette.isDark) 214 else 240)
+            color = if (glassStyle != null) {
+                withAlpha(Color.WHITE, glassStyle.surfaceFillAlpha)
+            } else {
+                withAlpha(palette.surface, if (palette.isDark) 214 else 240)
+            }
         }
         canvas.drawRoundRect(rect, 28f, 28f, cardPaint)
+        if (glassStyle != null) {
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = withAlpha(Color.WHITE, glassStyle.borderAlpha)
+                style = Paint.Style.STROKE
+                strokeWidth = 2f
+            }
+            canvas.drawRoundRect(rect, 28f, 28f, borderPaint)
+        }
 
         val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.primary

@@ -13,7 +13,6 @@ import java.net.URL
 class ReleaseManifestClient {
     companion object {
         private const val TAG = "TheDayUpdate"
-        private const val MANIFEST_URL = "https://github.com/rekjorekjo/TheDay/releases/latest/download/latest.json"
         private const val CONNECT_TIMEOUT = 15000
         private const val READ_TIMEOUT = 15000
         private const val MAX_MANIFEST_SIZE = 65536 // 64 KiB
@@ -40,8 +39,10 @@ class ReleaseManifestClient {
         return outputStream.toByteArray()
     }
 
-    suspend fun fetchLatestRelease(): GitHubRelease = withContext(Dispatchers.IO) {
-        val connection = URL(MANIFEST_URL).openConnection() as HttpURLConnection
+    suspend fun fetchLatestRelease(
+        targetEdition: UpdateEdition = UpdateChannel.currentEdition,
+    ): GitHubRelease = withContext(Dispatchers.IO) {
+        val connection = URL(UpdateChannel.manifestUrl(targetEdition)).openConnection() as HttpURLConnection
         connection.connectTimeout = CONNECT_TIMEOUT
         connection.readTimeout = READ_TIMEOUT
         connection.instanceFollowRedirects = true
@@ -72,6 +73,8 @@ class ReleaseManifestClient {
                 throw Exception("Unsupported schema version: $schemaVersion")
             }
 
+            UpdateChannel.validateManifestEdition(json.optString("edition", ""), targetEdition)
+
             val tagName = json.getString("tagName")
             if (!tagName.matches(Regex("^v\\d+\\.\\d+\\.\\d+$"))) {
                 throw Exception("Invalid tagName: $tagName")
@@ -97,7 +100,7 @@ class ReleaseManifestClient {
             val apk = json.getJSONObject("apk")
             val apkName = apk.getString("name")
 
-            val expectedApkName = "TheDay-$tagName.apk"
+            val expectedApkName = UpdateChannel.apkAssetName(tagName, targetEdition)
             if (apkName != expectedApkName) {
                 throw Exception("Invalid APK name: $apkName")
             }

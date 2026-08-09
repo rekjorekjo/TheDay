@@ -116,6 +116,65 @@ class DayRepository(context: Context) {
         preferences.edit().putString(KEY_MILESTONES, array.toString()).apply()
     }
 
+
+    fun loadAlbums(): List<DayAlbum> {
+        val raw = preferences.getString(KEY_ALBUMS, null) ?: return emptyList()
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    runCatching {
+                        val json = array.getJSONObject(index)
+                        val eventIdsJson = json.optJSONArray("eventIds") ?: JSONArray()
+                        val eventIds = buildList {
+                            for (eventIndex in 0 until eventIdsJson.length()) {
+                                eventIdsJson.optString(eventIndex)
+                                    .takeIf { it.isNotBlank() }
+                                    ?.let(::add)
+                            }
+                        }.distinct()
+
+                        DayAlbum(
+                            id = json.getString("id"),
+                            title = json.getString("title"),
+                            eventIds = eventIds,
+                            coverEventId = json.optString("coverEventId")
+                                .takeIf { it.isNotBlank() },
+                            createdAtEpochMillis = json.optLong(
+                                "createdAtEpochMillis",
+                                System.currentTimeMillis(),
+                            ),
+                            updatedAtEpochMillis = json.optLong(
+                                "updatedAtEpochMillis",
+                                System.currentTimeMillis(),
+                            ),
+                        )
+                    }.getOrNull()
+                        ?.takeIf { it.title.isNotBlank() }
+                        ?.let(::add)
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    fun saveAlbums(albums: List<DayAlbum>) {
+        val array = JSONArray()
+        albums.forEach { album ->
+            val eventIds = JSONArray()
+            album.eventIds.distinct().forEach(eventIds::put)
+
+            array.put(
+                JSONObject()
+                    .put("id", album.id)
+                    .put("title", album.title)
+                    .put("eventIds", eventIds)
+                    .put("coverEventId", album.coverEventId ?: JSONObject.NULL)
+                    .put("createdAtEpochMillis", album.createdAtEpochMillis)
+                    .put("updatedAtEpochMillis", album.updatedAtEpochMillis),
+            )
+        }
+        preferences.edit().putString(KEY_ALBUMS, array.toString()).apply()
+    }
     fun loadSettings(): AppSettings {
         val raw = preferences.getString(KEY_SETTINGS, null) ?: return AppSettings()
         return runCatching {
@@ -144,6 +203,14 @@ class DayRepository(context: Context) {
                 paletteStyle = paletteStyleFromRaw(
                     json.optString("paletteStyle"),
                 ),
+                glassClarity = json.optInt("glassClarity", 62).coerceIn(0, 100),
+                backgroundMotionMode = json.optString("backgroundMotionMode")
+                    .takeIf { it in setOf("STATIC", "FLOW", "AURORA") }
+                    ?: if (json.optBoolean("dynamicBackground", true)) "FLOW" else "STATIC",
+                backgroundTexture = json.optString("backgroundTexture", "DIAGONAL")
+                    .takeIf { it in setOf("NONE", "DIAGONAL", "WAVE", "STARS", "CONSTELLATION", "HEART") }
+                    ?: "DIAGONAL",
+                dynamicEdgeReflection = json.optBoolean("dynamicEdgeReflection", true),
                 sortMode = sortMode,
                 sortDirection = sortDirection,
                 showPastEvents = json.optBoolean("showPastEvents", true),
@@ -157,6 +224,11 @@ class DayRepository(context: Context) {
         val json = JSONObject()
             .put("themeMode", settings.themeMode.name)
             .put("paletteStyle", settings.paletteStyle.name)
+            .put("glassClarity", settings.glassClarity.coerceIn(0, 100))
+            .put("backgroundMotionMode", settings.backgroundMotionMode)
+            .put("dynamicBackground", settings.backgroundMotionMode != "STATIC")
+            .put("backgroundTexture", settings.backgroundTexture)
+            .put("dynamicEdgeReflection", settings.dynamicEdgeReflection)
             .put("sortMode", settings.sortMode.name)
             .put("sortDirection", settings.sortDirection.name)
             .put("showPastEvents", settings.showPastEvents)
@@ -405,5 +477,6 @@ class DayRepository(context: Context) {
         private const val KEY_NEW_EVENT_DRAFT = "new_event_draft_json"
         private const val KEY_CATEGORY_COVERS = "category_covers_json"
         private const val KEY_MILESTONES = "milestones_json"
+        private const val KEY_ALBUMS = "albums_json"
     }
 }

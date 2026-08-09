@@ -41,6 +41,10 @@
     <string name="update_install_button">安装更新</string>
     <string name="update_failed">检查失败，请稍后重试</string>
     <string name="update_download_failed">下载失败，请重新检查</string>
+    <string name="glass_upgrade_title">升级到 Glass</string>
+    <string name="glass_upgrade_description">直接替换 Classic，保留现有日子、图片与设置</string>
+    <string name="glass_upgrade_downloading">正在下载 Glass</string>
+    <string name="glass_upgrade_unavailable">暂无可用的 Glass 安装包</string>
     <string name="memory_image_title">纪念图</string>
     <string name="memory_image_change_template">切换纪念图模板</string>
     <string name="share_memory_image_chooser">分享纪念图</string>

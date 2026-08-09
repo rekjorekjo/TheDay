@@ -9,6 +9,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.Log
 import androidx.compose.ui.graphics.toArgb
+import io.github.thedayapp.BuildConfig
 import io.github.thedayapp.data.AppSettings
 import io.github.thedayapp.data.ThemeMode
 import io.github.thedayapp.ui.theme.colorSchemeFor
@@ -120,6 +121,7 @@ internal object MonthCalendarWidgetRenderer {
     }
 
     private fun isDarkMode(context: Context, themeMode: ThemeMode): Boolean {
+        if (BuildConfig.EDITION == "glass") return true
         return when (themeMode) {
             ThemeMode.LIGHT -> false
             ThemeMode.DARK -> true

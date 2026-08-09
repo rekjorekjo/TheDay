@@ -12,6 +12,9 @@ import io.github.thedayapp.data.TheDayState
 import io.github.thedayapp.ui.components.TheDayBottomBar
 import io.github.thedayapp.ui.components.TheDayTab
 import io.github.thedayapp.ui.screens.AboutScreen
+import io.github.thedayapp.ui.screens.AlbumListScreen
+import io.github.thedayapp.ui.screens.AlbumEditorScreen
+import io.github.thedayapp.ui.screens.AlbumDetailScreen
 import io.github.thedayapp.ui.screens.CategoryDetailScreen
 import io.github.thedayapp.ui.screens.CategoryScreen
 import io.github.thedayapp.ui.screens.DateCalculatorScreen
@@ -30,6 +33,7 @@ private sealed interface EventReturnTarget {
     data object Home : EventReturnTarget
     data object Export : EventReturnTarget
     data class Category(val categoryName: String) : EventReturnTarget
+    data class Album(val albumId: String) : EventReturnTarget
 }
 
 private sealed interface Screen {
@@ -39,6 +43,9 @@ private sealed interface Screen {
     data object New : Screen
     data object Tools : Screen
     data object Export : Screen
+    data object Albums : Screen
+    data class AlbumDetail(val albumId: String) : Screen
+    data class AlbumEditor(val albumId: String?) : Screen
     data object Milestones : Screen
     data object Calculator : Screen
     data object Settings : Screen
@@ -65,6 +72,7 @@ private fun EventReturnTarget.toScreen(): Screen {
         EventReturnTarget.Home -> Screen.Home
         EventReturnTarget.Export -> Screen.Export
         is EventReturnTarget.Category -> Screen.CategoryDetail(categoryName)
+        is EventReturnTarget.Album -> Screen.AlbumDetail(albumId)
     }
 }
 
@@ -116,6 +124,12 @@ fun TheDayApp(
             is Screen.CategoryDetail -> Screen.Categories
             is Screen.Categories -> Screen.Home
             is Screen.Export -> Screen.Tools
+            is Screen.Albums -> Screen.Tools
+            is Screen.AlbumDetail -> Screen.Albums
+            is Screen.AlbumEditor -> {
+                val editor = screen as Screen.AlbumEditor
+                editor.albumId?.let { Screen.AlbumDetail(it) } ?: Screen.Albums
+            }
             is Screen.Milestones -> Screen.Tools
             is Screen.Calculator -> Screen.Tools
             is Screen.Tools -> Screen.Home
@@ -167,10 +181,79 @@ fun TheDayApp(
             },
             onBack = { screen = Screen.Home },
             onOpenExport = { screen = Screen.Export },
+            onOpenAlbums = { screen = Screen.Albums },
             onOpenMilestones = { screen = Screen.Milestones },
             onOpenCalculator = { screen = Screen.Calculator },
         )
 
+
+        Screen.Albums -> AlbumListScreen(
+            state = state,
+            onBack = { screen = Screen.Tools },
+            onCreateAlbum = { screen = Screen.AlbumEditor(null) },
+            onOpenAlbum = { albumId -> screen = Screen.AlbumDetail(albumId) },
+        )
+
+        is Screen.AlbumDetail -> {
+            val album = state.albumById(current.albumId)
+            if (album == null) {
+                LaunchedEffect(current.albumId) {
+                    screen = Screen.Albums
+                }
+            } else {
+                val eventById = state.events.associateBy { it.id }
+                AlbumDetailScreen(
+                    album = album,
+                    events = album.eventIds.mapNotNull(eventById::get),
+                    today = state.today,
+                    onBack = { screen = Screen.Albums },
+                    onEdit = { screen = Screen.AlbumEditor(album.id) },
+                    onSetCover = { eventId ->
+                        state.upsertAlbum(album.copy(coverEventId = eventId))
+                    },
+                    onRemoveEvent = { eventId ->
+                        val updatedEventIds = album.eventIds.filterNot { it == eventId }
+                        state.upsertAlbum(
+                            album.copy(
+                                eventIds = updatedEventIds,
+                                coverEventId = album.coverEventId
+                                    ?.takeIf {
+                                        it != eventId && it in updatedEventIds
+                                    }
+                                    ?: updatedEventIds.firstOrNull(),
+                            ),
+                        )
+                    },
+                    onOpenEvent = { eventId ->
+                        screen = Screen.Detail(
+                            eventId = eventId,
+                            returnTarget = EventReturnTarget.Album(album.id),
+                        )
+                    },
+                )
+            }
+        }
+
+        is Screen.AlbumEditor -> {
+            val album = current.albumId?.let(state::albumById)
+            if (current.albumId != null && album == null) {
+                LaunchedEffect(current.albumId) {
+                    screen = Screen.Albums
+                }
+            } else {
+                AlbumEditorScreen(
+                    album = album,
+                    events = state.events,
+                    onBack = {
+                        screen = album?.let { Screen.AlbumDetail(it.id) } ?: Screen.Albums
+                    },
+                    onSave = { updatedAlbum ->
+                        state.upsertAlbum(updatedAlbum)
+                        screen = Screen.AlbumDetail(updatedAlbum.id)
+                    },
+                )
+            }
+        }
         Screen.Milestones -> MilestoneScreen(
             state = state,
             onBack = { screen = Screen.Tools },

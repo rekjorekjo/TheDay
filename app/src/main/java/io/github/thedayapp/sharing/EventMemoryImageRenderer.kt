@@ -308,6 +308,7 @@ object EventMemoryImageRenderer {
         today: LocalDate,
         palette: MemoryImagePalette,
         template: MemoryImageTemplate,
+        glassStyle: GlassExportStyle? = null,
     ): Result<Bitmap> {
         return try {
             val bitmap = withContext(Dispatchers.Default) {
@@ -317,6 +318,7 @@ object EventMemoryImageRenderer {
                     today = today,
                     palette = palette,
                     template = template,
+                    glassStyle = glassStyle,
                 )
             }
             Result.success(bitmap)
@@ -333,6 +335,7 @@ object EventMemoryImageRenderer {
         today: LocalDate,
         palette: MemoryImagePalette,
         template: MemoryImageTemplate,
+        glassStyle: GlassExportStyle?,
     ): Bitmap {
         val imageReference = event.backgroundImage
         val imageFile = imageReference
@@ -411,14 +414,17 @@ object EventMemoryImageRenderer {
                 template = template,
                 hasBackgroundImage = hasBackgroundImage,
                 random = random,
+                glassStyle = glassStyle,
             )
-            drawCardShadowLayer(
-                canvas = canvas,
-                cardRect = cardRect,
-                cardRadius = cardRadius,
-                palette = palette,
-                baseSize = baseSize,
-            )
+            if (glassStyle == null || hasBackgroundImage) {
+                drawCardShadowLayer(
+                    canvas = canvas,
+                    cardRect = cardRect,
+                    cardRadius = cardRadius,
+                    palette = palette,
+                    baseSize = baseSize,
+                )
+            }
             drawMiddleLayerText(
                 canvas = canvas,
                 canvasRect = canvasRect,
@@ -435,6 +441,7 @@ object EventMemoryImageRenderer {
                 cardRect = cardRect,
                 palette = palette,
                 hasBackgroundImage = hasBackgroundImage,
+                glassStyle = glassStyle,
             )
 
             if (sourceBitmap != null && imageReference != null) {
@@ -451,6 +458,7 @@ object EventMemoryImageRenderer {
                 cardRect = cardRect,
                 palette = palette,
                 hasBackgroundImage = hasBackgroundImage,
+                glassStyle = glassStyle,
             )
 
             drawMainContent(
@@ -463,7 +471,9 @@ object EventMemoryImageRenderer {
             )
             canvas.restoreToCount(cardSaveCount)
 
-            val borderColor = if (palette.isDark) {
+            val borderColor = if (!hasBackgroundImage && glassStyle != null) {
+                withAlpha(Color.WHITE, glassStyle.borderAlpha)
+            } else if (palette.isDark) {
                 withAlpha(palette.primary, 112)
             } else {
                 withAlpha(palette.primary, 132)
@@ -524,7 +534,13 @@ object EventMemoryImageRenderer {
         template: MemoryImageTemplate,
         hasBackgroundImage: Boolean,
         random: Random,
+        glassStyle: GlassExportStyle?,
     ) {
+        if (glassStyle != null) {
+            drawGlassBackdrop(canvas, canvasRect, glassStyle)
+            return
+        }
+
         val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 canvasRect.left,
@@ -574,6 +590,14 @@ object EventMemoryImageRenderer {
             template = template,
             hasBackgroundImage = hasBackgroundImage,
         )
+    }
+
+    private fun drawGlassBackdrop(
+        canvas: Canvas,
+        canvasRect: RectF,
+        style: GlassExportStyle,
+    ) {
+        GlassExportBackdrop.draw(canvas, canvasRect, style)
     }
 
     private fun drawCardShadowLayer(
@@ -767,11 +791,17 @@ object EventMemoryImageRenderer {
         cardRect: RectF,
         palette: MemoryImagePalette,
         hasBackgroundImage: Boolean,
+        glassStyle: GlassExportStyle?,
     ) {
         val colors = if (hasBackgroundImage) {
             intArrayOf(
                 withAlpha(Color.WHITE, 14),
                 Color.TRANSPARENT,
+            )
+        } else if (glassStyle != null) {
+            intArrayOf(
+                withAlpha(Color.WHITE, glassStyle.surfaceFillAlpha),
+                withAlpha(Color.WHITE, (glassStyle.surfaceFillAlpha * 0.72f).roundToInt()),
             )
         } else {
             intArrayOf(
@@ -799,7 +829,10 @@ object EventMemoryImageRenderer {
         cardRect: RectF,
         palette: MemoryImagePalette,
         hasBackgroundImage: Boolean,
+        glassStyle: GlassExportStyle?,
     ) {
+        if (!hasBackgroundImage && glassStyle != null) return
+
         if (hasBackgroundImage) {
             val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = LinearGradient(

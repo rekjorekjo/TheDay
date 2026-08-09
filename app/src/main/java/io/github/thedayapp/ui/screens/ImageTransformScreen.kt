@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.thedayapp.ui.currentJavaLocale
 import io.github.thedayapp.data.DayEvent
 import io.github.thedayapp.data.ImagePlacementTarget
 import io.github.thedayapp.data.ImageTransform
@@ -93,7 +94,7 @@ fun ImageTransformScreen(
     val previewAspectRatio = image
         ?.let { adaptiveEventImagePreviewAspectRatio(it, cardType) }
         ?: 1f
-    val locale = Locale.getDefault()
+    val locale = currentJavaLocale()
     val delta = DayMath.signedDays(event, today)
     val displayDate = DayMath.effectiveDate(event, today)
 

@@ -24,7 +24,7 @@ limitations under the License.
 
 ## AndroidX 与 Jetpack Compose
 
-The Day 使用 Google 提供的 AndroidX 和 Jetpack Compose 库构建用户界面。
+The Day 使用 Google 提供的 AndroidX 和 Jetpack Compose 库构建 Classic 界面及 Android 系统集成功能。
 
 - 版权所有：Google LLC
 - 许可证：Apache License 2.0
@@ -35,6 +35,17 @@ The Day 使用 Google 提供的 AndroidX 和 Jetpack Compose 库构建用户界�
 - Material 3：Material Design 3 组件和主题
 - Lifecycle：生命周期感知组件
 - ViewModel：数据管理和界面状态保存
+
+## Flutter
+
+The Day 的 Glass Edition 使用 Flutter SDK 构建用户界面。
+
+- 开发者：Google LLC 与 Flutter Contributors
+- 用途：Glass Edition 的界面、动画、导航和本地化支持
+- 许可证：BSD 3-Clause License
+- 源代码：https://github.com/flutter/flutter
+
+Flutter 及其随 SDK 提供的相关组件按照各自开源许可证提供。The Day 对 Flutter 的使用不代表 Google 或 Flutter Contributors 对 The Day 的认可或背书。
 
 ## uCrop
 
@@ -58,7 +69,7 @@ The Day 的 Bloom 系列主题配色参考并重新映射自 Bloom for Typora。
 - 许可证：MIT License
 - 源代码：https://github.com/webkubor/typora-Bloom-theme
 
-The Day 使用 Bloom 的色彩家族作为设计参考，并将其重新映射为 Android Material 3 的颜色角色；并未复制 Typora 的排版、字体或界面代码。
+The Day 使用 Bloom 的色彩家族作为设计参考，并将其重新映射为应用主题颜色；并未复制 Typora 的排版、字体或界面代码。
 
 ### MIT License
 

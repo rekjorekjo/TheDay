@@ -39,7 +39,9 @@ class GitHubReleaseClient {
         return outputStream.toByteArray()
     }
 
-    suspend fun fetchLatestRelease(): GitHubRelease = withContext(Dispatchers.IO) {
+    suspend fun fetchLatestRelease(
+        targetEdition: UpdateEdition = UpdateChannel.currentEdition,
+    ): GitHubRelease = withContext(Dispatchers.IO) {
         val connection = URL(API_URL).openConnection() as HttpURLConnection
         connection.connectTimeout = CONNECT_TIMEOUT
         connection.readTimeout = READ_TIMEOUT
@@ -73,6 +75,7 @@ class GitHubReleaseClient {
             val versionName = tagName.substring(1)
             val releaseNotes = json.optString("body", "").take(20000)
 
+            val expectedApkName = UpdateChannel.apkAssetName(tagName, targetEdition)
             val assets = json.getJSONArray("assets")
             var apkCount = 0
             var apkAsset: JSONObject? = null
@@ -80,7 +83,7 @@ class GitHubReleaseClient {
             for (i in 0 until assets.length()) {
                 val asset = assets.getJSONObject(i)
                 val name = asset.getString("name")
-                if (name == "TheDay-$tagName.apk") {
+                if (name == expectedApkName) {
                     apkCount++
                     apkAsset = asset
                 }

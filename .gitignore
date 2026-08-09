@@ -17,7 +17,6 @@ source.zip
 
 # Local bootstrap and downloaded build tools
 tools/
-scripts/
 
 # Build packages
 *.apk
@@ -34,3 +33,17 @@ keystore.properties
 # Python
 __pycache__/
 *.py[cod]
+# Flutter Glass module generated state
+glass_flutter/.android/
+glass_flutter/.ios/
+glass_flutter/.dart_tool/
+glass_flutter/build/
+glass_flutter/.flutter-plugins
+glass_flutter/.flutter-plugins-dependencies
+glass_flutter/.packages
+
+# Android release build output
+/app/release/
+
+# JVM crash / heap dumps
+*.hprof

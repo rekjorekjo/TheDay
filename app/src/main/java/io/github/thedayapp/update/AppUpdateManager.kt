@@ -43,7 +43,16 @@ class AppUpdateManager(context: Context) {
         val currentVersion = parseSemanticVersion(BuildConfig.VERSION_NAME) ?: return
         val pendingVersion = parseSemanticVersion(pendingVersionName) ?: return
 
-        if (compareSemanticVersions(currentVersion, pendingVersion) < 0) {
+        val versionComparison = compareSemanticVersions(currentVersion, pendingVersion)
+        if (versionComparison < 0) {
+            return
+        }
+
+        val isPendingClassicToGlassReplacement =
+            BuildConfig.EDITION == "classic" &&
+                preferences.pendingTargetEdition == "glass" &&
+                versionComparison == 0
+        if (isPendingClassicToGlassReplacement) {
             return
         }
 
@@ -113,15 +122,39 @@ class AppUpdateManager(context: Context) {
         return v1.third.compareTo(v2.third)
     }
 
-    suspend fun checkForUpdate(): UpdateCheckResult {
+    suspend fun checkForUpdate(): UpdateCheckResult =
+        checkForEdition(
+            targetEdition = UpdateChannel.currentEdition,
+            allowSameVersion = false,
+        )
+
+    /**
+     * Classic -> Glass is an edition replacement, not a data import. Glass uses
+     * the same application id and signing key, so Android keeps the existing
+     * app-private data. Equal version codes are valid for an Android update and
+     * are intentionally accepted here so a Classic 3.0.0 build can switch to
+     * the Glass 3.0.0 build without manufacturing a fake version bump.
+     */
+    suspend fun checkForGlassUpgrade(): UpdateCheckResult {
+        if (BuildConfig.EDITION == "glass") return UpdateCheckResult.UpToDate
+        return checkForEdition(
+            targetEdition = UpdateEdition.GLASS,
+            allowSameVersion = true,
+        )
+    }
+
+    private suspend fun checkForEdition(
+        targetEdition: UpdateEdition,
+        allowSameVersion: Boolean,
+    ): UpdateCheckResult {
         return try {
             val release = try {
-                manifestClient.fetchLatestRelease()
+                manifestClient.fetchLatestRelease(targetEdition)
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
                 Log.w(TAG, "Manifest failed, falling back to GitHub API", exception)
-                githubClient.fetchLatestRelease()
+                githubClient.fetchLatestRelease(targetEdition)
             }
 
             val currentVersion = BuildConfig.VERSION_NAME
@@ -139,10 +172,15 @@ class AppUpdateManager(context: Context) {
                 UpdateSource.MANIFEST -> {
                     val currentVersionCode = BuildConfig.VERSION_CODE.toLong()
                     val remoteVersionCode = release.versionCode ?: return UpdateCheckResult.CheckFailed
-                    remoteVersionCode > currentVersionCode && versionComparison >= 0
+                    val versionCodeOk = if (allowSameVersion) {
+                        remoteVersionCode >= currentVersionCode
+                    } else {
+                        remoteVersionCode > currentVersionCode
+                    }
+                    versionCodeOk && versionComparison >= 0
                 }
                 UpdateSource.GITHUB_API -> {
-                    versionComparison > 0
+                    if (allowSameVersion) versionComparison >= 0 else versionComparison > 0
                 }
             }
 
@@ -218,6 +256,8 @@ class AppUpdateManager(context: Context) {
         preferences.downloadFailed = false
         preferences.verified = false
         preferences.pendingAssetName = release.apkAssetName
+        preferences.pendingTargetEdition =
+            if (release.apkAssetName.startsWith("TheDay-Glass-")) "glass" else "classic"
 
         val request = DownloadManager.Request(Uri.parse(release.apkDownloadUrl))
             .setTitle("The Day ${release.versionName}")

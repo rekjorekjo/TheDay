@@ -1,5 +1,37 @@
 # Changelog
 
+## 3.0.0 - Dual Edition foundation
+
+- Glass final visual pass uses a dark-only Liquid Glass system with 16 palettes and three background modes: Static, a 36-second three-light Flow orbit around the outer edge, and Aurora reusing the same low-cost three-light engine while moving the orbit into the content area and giving each light a distinct elliptical aspect, rotation and slow organic shape breathing without changing the dark base; six full-screen textures remain available: Pure, Rain, Snowflakes, Meteors, Galaxy and Hearts. Rain uses fine drifting rain streaks, while Snowflakes uses gently falling flakes over the dark Glass background; Meteors streak downward from the upper screen; Galaxy keeps the previous constellation-style points and connecting lines. Layered glass rims and preserved depth shadows remain available.
+- Glass exports snapshot the current background mode, ambient-light phase and selected texture so Flow preserves the live outer-orbit positions and Aurora preserves the same three lights on the inner orbit in memorial, long-image, list and milestone outputs.
+- Bottom navigation now uses one shared Liquid Glass selection capsule that slides between the four main destinations over 480 ms with no stretch/squash or per-button press/selection animation; icon and label color track the capsule motion directly.
+- Glass reverse navigation uses a 150 ms snapshot-assisted fade/scale settle, eliminating the brief ghost-frame effect seen in earlier builds.
+- Removed device-tilt reflection and sensor-driven rim effects; Glass cards keep the stable fixed depth/rim treatment.
+- Reduced explanatory/demo-like copy across Glass while retaining necessary state, risk-confirmation and error messaging.
+- Added `classic` and `glass` Android product flavors.
+- Classic keeps the original Compose UI.
+- Glass now uses a Flutter Add-to-App full-screen UI; Kotlin remains the source of truth for events, sorting/date logic, reminders, widgets, files and Android system features.
+- Glass currently validates Home, Categories, New Event, Event Detail, long Settings scrolling, bottom navigation and native data writes before the remaining screens are migrated.
+- Added shared Glass Clarity persistence (0-100) and palette-driven ambient backgrounds.
+- Raised minimum Android version to Android 12 / API 31.
+- Added uninstall-time fragile user data preservation prompt.
+- Classic and Glass now share the `io.github.thedayapp` application id. Same-key Glass builds can replace Classic in-place while preserving app-private data and widget state; the two editions therefore no longer install side by side.
+- Added edition-aware release channels: Classic uses `latest.json` / `TheDay-vX.Y.Z.apk`, Glass uses `latest-glass.json` / `TheDay-Glass-vX.Y.Z.apk`.
+- Classic About now exposes an explicit “Upgrade to Glass” path that reads the Glass channel and accepts an equal-or-newer Glass build for an in-place edition replacement.
+- Added optional Gradle release signing through private `keystore.properties` plus a dual-edition `scripts/release.py` workflow.
+- Added `scripts/setup_flutter_glass.ps1` / `.sh` to bootstrap the generated Flutter Android wrapper and run analysis.
+- Added `scripts/apk_size_report.py` for side-by-side APK composition diagnostics.
+
+
+## 2.4.1
+
+- 工具栏新增“纪念册”入口，并将工具栏功能顺序更新为导出、里程碑、计算器、纪念册。
+- 新增纪念册功能：可从已有日子中选择多个条目组成纪念册，选择列表显示分类以便区分同名日子。
+- 纪念册详情页采用卡片堆叠式图片浏览，支持左右滑动切换、首尾循环和圆点指示。
+- 纪念册详情页右上角支持设置封面和编辑纪念册；长按当前图片可打开底部悬浮工具栏，支持移出纪念册、编辑对应日子和完成操作。
+- 里程碑列表支持长按卡片上下拖动排序并保存顺序；长按本身不再触发高亮，只有拖动中或手动选中后才变色。
+- 设置页主题色选中态改为同色发光效果，去掉原先偏重的黑色外框。
+- 更新发布说明和应用内使用说明。
 ## 2.3.3
 
 - 首页右上角改为工具栏入口，底部导航保留“日子、分类、新增、设置”。

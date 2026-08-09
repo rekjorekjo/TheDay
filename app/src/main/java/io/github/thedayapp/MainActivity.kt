@@ -10,8 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.thedayapp.data.TheDayState
-import io.github.thedayapp.ui.TheDayApp
-import io.github.thedayapp.ui.theme.TheDayTheme
+import io.github.thedayapp.ui.AppEntry
 import io.github.thedayapp.update.UpdateActions
 import io.github.thedayapp.update.AppUpdateManager
 import io.github.thedayapp.update.UpdatePreferences
@@ -35,13 +34,11 @@ class MainActivity : ComponentActivity() {
         handleLaunchIntent(intent)
 
         setContent {
-            TheDayTheme(settings = appState.settings) {
-                TheDayApp(
-                    state = appState,
-                    requestedEventId = openEventId,
-                    onRequestedEventConsumed = { openEventId = null },
-                )
-            }
+            AppEntry(
+                state = appState,
+                requestedEventId = openEventId,
+                onRequestedEventConsumed = { openEventId = null },
+            )
         }
     }
 

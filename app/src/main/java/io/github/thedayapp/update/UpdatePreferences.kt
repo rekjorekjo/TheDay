@@ -30,6 +30,10 @@ class UpdatePreferences(context: Context) {
         get() = preferences.getString("pending_asset_name", null)
         set(value) = preferences.edit().putString("pending_asset_name", value).apply()
 
+    var pendingTargetEdition: String?
+        get() = preferences.getString("pending_target_edition", null)
+        set(value) = preferences.edit().putString("pending_target_edition", value).apply()
+
     var pendingSha256: String?
         get() = preferences.getString("pending_sha256", null)
         set(value) = preferences.edit().putString("pending_sha256", value).apply()
@@ -56,6 +60,7 @@ class UpdatePreferences(context: Context) {
             remove("pending_version_name")
             remove("pending_tag_name")
             remove("pending_asset_name")
+            remove("pending_target_edition")
             remove("pending_sha256")
             putLong("pending_apk_size", 0)
             putBoolean("verified", false)

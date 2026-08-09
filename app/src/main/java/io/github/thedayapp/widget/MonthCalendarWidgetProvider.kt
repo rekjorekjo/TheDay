@@ -11,6 +11,7 @@ import android.widget.RemoteViews
 import androidx.compose.ui.graphics.toArgb
 import io.github.thedayapp.MainActivity
 import io.github.thedayapp.R
+import io.github.thedayapp.BuildConfig
 import io.github.thedayapp.data.DayRepository
 import java.time.LocalDate
 import java.time.YearMonth
@@ -224,6 +225,7 @@ class MonthCalendarWidgetProvider : AppWidgetProvider() {
             context: Context,
             themeMode: io.github.thedayapp.data.ThemeMode,
         ): Boolean {
+            if (BuildConfig.EDITION == "glass") return true
             return when (themeMode) {
                 io.github.thedayapp.data.ThemeMode.LIGHT -> false
                 io.github.thedayapp.data.ThemeMode.DARK -> true

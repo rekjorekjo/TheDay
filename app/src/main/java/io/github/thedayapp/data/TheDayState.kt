@@ -7,6 +7,7 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import io.github.thedayapp.domain.UNCLASSIFIED_CATEGORY_NAME
 import io.github.thedayapp.domain.normalizedCategoryName
 import io.github.thedayapp.media.LocalImageStore
 import io.github.thedayapp.notification.ReminderScheduler
@@ -28,6 +29,9 @@ class TheDayState(context: Context) {
         private set
 
     var milestones: List<DayMilestone> by mutableStateOf(repository.loadMilestones())
+        private set
+
+    var albums: List<DayAlbum> by mutableStateOf(repository.loadAlbums())
         private set
 
     var today: LocalDate by mutableStateOf(LocalDate.now())
@@ -137,6 +141,8 @@ class TheDayState(context: Context) {
 
     fun eventById(id: String): DayEvent? = events.firstOrNull { it.id == id }
 
+    fun albumById(id: String): DayAlbum? = albums.firstOrNull { it.id == id }
+
     fun upsertEvent(event: DayEvent) {
         val existingEvent = eventById(event.id)
         val previousImageFileNames = imageFileNames(existingEvent?.backgroundImage)
@@ -148,9 +154,13 @@ class TheDayState(context: Context) {
             events + event
         }
         repository.saveEvents(events)
-        ReminderScheduler.schedule(appContext, event, settings)
-        DayWidgetProvider.requestUpdate(appContext)
-        MonthCalendarWidgetProvider.requestUpdate(appContext)
+
+        // Event persistence is the primary operation. Reminder/widget refreshes are
+        // best-effort side effects and must never make an already-saved event look
+        // like a failed save to the UI.
+        runCatching { ReminderScheduler.schedule(appContext, event, settings) }
+        runCatching { DayWidgetProvider.requestUpdate(appContext) }
+        runCatching { MonthCalendarWidgetProvider.requestUpdate(appContext) }
 
         releaseImageFilesIfUnreferenced(
             previousImageFileNames - imageFileNames(event.backgroundImage),
@@ -164,6 +174,7 @@ class TheDayState(context: Context) {
         ReminderScheduler.cancel(appContext, id)
         events = events.filterNot { it.id == id }
         repository.saveEvents(events)
+        removeEventFromAlbums(id)
         DayWidgetProvider.requestUpdate(appContext)
         MonthCalendarWidgetProvider.requestUpdate(appContext)
 
@@ -175,6 +186,34 @@ class TheDayState(context: Context) {
         upsertEvent(event.copy(isPinned = !event.isPinned))
     }
 
+    fun upsertAlbum(album: DayAlbum) {
+        val validEventIds = album.eventIds
+            .distinct()
+            .filter { eventId -> eventById(eventId) != null }
+        val coverEventId = album.coverEventId
+            ?.takeIf { it in validEventIds }
+            ?: validEventIds.firstOrNull()
+
+        val cleanAlbum = album.copy(
+            title = album.title.trim(),
+            eventIds = validEventIds,
+            coverEventId = coverEventId,
+            updatedAtEpochMillis = System.currentTimeMillis(),
+        )
+
+        val existingIndex = albums.indexOfFirst { it.id == cleanAlbum.id }
+        albums = if (existingIndex >= 0) {
+            albums.toMutableList().also { it[existingIndex] = cleanAlbum }
+        } else {
+            albums + cleanAlbum
+        }
+        repository.saveAlbums(albums)
+    }
+
+    fun deleteAlbum(id: String) {
+        albums = albums.filterNot { it.id == id }
+        repository.saveAlbums(albums)
+    }
     fun upsertMilestone(milestone: DayMilestone) {
         val existingIndex = milestones.indexOfFirst { it.id == milestone.id }
         milestones = if (existingIndex >= 0) {
@@ -190,6 +229,21 @@ class TheDayState(context: Context) {
         if (fromIndex !in milestones.indices) return false
 
         val toIndex = (fromIndex + direction).coerceIn(0, milestones.lastIndex)
+        if (fromIndex == toIndex) return false
+
+        milestones = milestones.toMutableList().also { list ->
+            val moved = list.removeAt(fromIndex)
+            list.add(toIndex, moved)
+        }
+        repository.saveMilestones(milestones)
+        return true
+    }
+
+    fun moveMilestoneToIndex(id: String, targetIndex: Int): Boolean {
+        val fromIndex = milestones.indexOfFirst { it.id == id }
+        if (fromIndex !in milestones.indices) return false
+
+        val toIndex = targetIndex.coerceIn(0, milestones.lastIndex)
         if (fromIndex == toIndex) return false
 
         milestones = milestones.toMutableList().also { list ->
@@ -240,6 +294,16 @@ class TheDayState(context: Context) {
         events.forEach { ReminderScheduler.cancel(appContext, it.id) }
         events = emptyList()
         repository.saveEvents(events)
+        if (albums.any { it.eventIds.isNotEmpty() || it.coverEventId != null }) {
+            albums = albums.map { album ->
+                album.copy(
+                    eventIds = emptyList(),
+                    coverEventId = null,
+                    updatedAtEpochMillis = System.currentTimeMillis(),
+                )
+            }
+            repository.saveAlbums(albums)
+        }
         DayWidgetProvider.requestUpdate(appContext)
         MonthCalendarWidgetProvider.requestUpdate(appContext)
 
@@ -291,6 +355,57 @@ class TheDayState(context: Context) {
         )
     }
 
+    fun deleteCategory(categoryName: String): Boolean {
+        val normalizedName = normalizedCategoryName(categoryName)
+        if (normalizedName == UNCLASSIFIED_CATEGORY_NAME) return false
+
+        val previousCoverFiles = imageFileNames(categoryCovers[normalizedName])
+        var changed = false
+        events = events.map { event ->
+            if (normalizedCategoryName(event.category) == normalizedName) {
+                changed = true
+                event.copy(category = "")
+            } else {
+                event
+            }
+        }
+        if (changed) {
+            repository.saveEvents(events)
+        }
+
+        if (normalizedName in categoryCovers) {
+            categoryCovers = categoryCovers - normalizedName
+            repository.saveCategoryCovers(categoryCovers)
+        }
+
+        runCatching { DayWidgetProvider.requestUpdate(appContext) }
+        runCatching { MonthCalendarWidgetProvider.requestUpdate(appContext) }
+        releaseImageFilesIfUnreferenced(previousCoverFiles)
+        return changed || previousCoverFiles.isNotEmpty()
+    }
+
+    private fun removeEventFromAlbums(eventId: String) {
+        var changed = false
+        val updatedAlbums = albums.map { album ->
+            if (eventId !in album.eventIds && album.coverEventId != eventId) {
+                album
+            } else {
+                changed = true
+                val updatedEventIds = album.eventIds.filterNot { it == eventId }
+                album.copy(
+                    eventIds = updatedEventIds,
+                    coverEventId = album.coverEventId
+                        ?.takeIf { it != eventId && it in updatedEventIds }
+                        ?: updatedEventIds.firstOrNull(),
+                    updatedAtEpochMillis = System.currentTimeMillis(),
+                )
+            }
+        }
+        if (changed) {
+            albums = updatedAlbums
+            repository.saveAlbums(albums)
+        }
+    }
     private fun imageFileNames(image: LocalImageReference?): Set<String> {
         if (image == null) return emptySet()
 

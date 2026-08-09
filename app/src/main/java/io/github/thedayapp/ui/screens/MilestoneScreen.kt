@@ -14,7 +14,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -91,6 +90,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
+import io.github.thedayapp.ui.currentJavaLocale
 import io.github.thedayapp.data.DayEvent
 import io.github.thedayapp.data.DayMilestone
 import io.github.thedayapp.data.TheDayState
@@ -130,7 +130,7 @@ fun MilestoneScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val locale = Locale.getDefault()
+    val locale = currentJavaLocale()
     var showEditor by remember { mutableStateOf(false) }
     var step by remember { mutableStateOf(MilestoneStep.LIST) }
     var selectedTemplate by remember { mutableStateOf(MemoryImageTemplate.MINIMAL) }
@@ -140,7 +140,6 @@ fun MilestoneScreen(
     val selectedIds = remember { mutableStateListOf<String>() }
     val sortedSelectedIds = remember { mutableStateListOf<String>() }
     var manageMode by remember { mutableStateOf(false) }
-    var highlightedId by remember { mutableStateOf<String?>(null) }
     val isWorking = workingAction != null
     val selectionMode = manageMode
 
@@ -155,7 +154,6 @@ fun MilestoneScreen(
             MilestoneStep.SORT -> step = MilestoneStep.LIST
             MilestoneStep.LIST -> {
                 selectedIds.clear()
-                highlightedId = null
                 manageMode = false
             }
         }
@@ -187,7 +185,6 @@ fun MilestoneScreen(
         selectedIds.toList().forEach { id -> state.deleteMilestone(id) }
         selectedIds.clear()
         sortedSelectedIds.clear()
-        highlightedId = null
         manageMode = false
         step = MilestoneStep.LIST
     }
@@ -309,7 +306,7 @@ fun MilestoneScreen(
                         navigationIcon = {
                             IconButton(
                                 onClick = {
-                                    if (selectionMode) { selectedIds.clear(); highlightedId = null; manageMode = false } else onBack()
+                                    if (selectionMode) { selectedIds.clear(); manageMode = false } else onBack()
                                 },
                             ) {
                                 Icon(Icons.Rounded.ArrowBack, contentDescription = "返回")
@@ -369,25 +366,20 @@ fun MilestoneScreen(
                 today = state.today,
                 locale = locale,
                 selectedIds = selectedIds,
-                highlightedId = highlightedId,
                 selectionMode = selectionMode,
                 onToggleSelection = { milestoneId ->
+                    manageMode = true
                     if (milestoneId in selectedIds) {
                         selectedIds.remove(milestoneId)
                     } else {
                         selectedIds.add(milestoneId)
                     }
                 },
-                onStartSelection = { milestoneId ->
-                    highlightedId = milestoneId
-                    manageMode = true
-                },
                 onMove = state::moveMilestone,
                 onExportSelected = ::openSort,
                 onDeleteSelected = ::deleteSelectedMilestones,
                 onDoneSelection = {
                     selectedIds.clear()
-                    highlightedId = null
                     manageMode = false
                 },
             )
@@ -445,10 +437,8 @@ private fun MilestoneListPage(
     today: LocalDate,
     locale: Locale,
     selectedIds: List<String>,
-    highlightedId: String?,
     selectionMode: Boolean,
     onToggleSelection: (String) -> Unit,
-    onStartSelection: (String) -> Unit,
     onMove: (String, Int) -> Boolean,
     onExportSelected: () -> Unit,
     onDeleteSelected: () -> Unit,
@@ -500,10 +490,10 @@ private fun MilestoneListPage(
             } else {
                 items(milestones, key = { it.id }) { milestone ->
                     val selected = milestone.id in selectedIds
-                    val highlighted = milestone.id == highlightedId
                     val isDragging = draggedId == milestone.id
+                    val highlighted = isDragging && dragOffset != 0f
                     val itemHeight = itemHeights[milestone.id]?.toFloat() ?: 1f
-                    val dragModifier = (if (isDragging || selectionMode) {
+                    val dragModifier = (if (isDragging) {
                         Modifier
                     } else {
                         Modifier.animateItem(
@@ -523,11 +513,8 @@ private fun MilestoneListPage(
                             itemHeights[milestone.id] = size.height
                         }
                         .then(
-                            if (selectionMode) {
-                                Modifier
-                            } else {
-                                Modifier.pointerInput(milestone.id) {
-                                    detectDragGesturesAfterLongPress(
+                            Modifier.pointerInput(milestone.id) {
+                                detectDragGesturesAfterLongPress(
                                         onDragStart = {
                                             draggedId = milestone.id
                                             dragOffset = 0f
@@ -581,8 +568,7 @@ private fun MilestoneListPage(
                                                 }
                                             }
                                         },
-                                    )
-                                }
+                                )
                             },
                         )
 
@@ -594,9 +580,8 @@ private fun MilestoneListPage(
                         highlighted = highlighted,
                         selectionMode = selectionMode,
                         onClick = {
-                            if (selectionMode) onToggleSelection(milestone.id)
+                            onToggleSelection(milestone.id)
                         },
-                        onLongClick = { onStartSelection(milestone.id) },
                         modifier = dragModifier,
                     )
                 }
@@ -664,7 +649,6 @@ private fun MilestoneCard(
     highlighted: Boolean,
     selectionMode: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val delta = ChronoUnit.DAYS.between(today, milestone.date)
@@ -679,10 +663,7 @@ private fun MilestoneCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick,
-            ),
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
@@ -1166,6 +1147,7 @@ private fun MilestoneEditorDialog(
     var note by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(initialDate) }
     var showDatePicker by remember { mutableStateOf(false) }
+    val locale = currentJavaLocale()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1188,7 +1170,7 @@ private fun MilestoneEditorDialog(
                 ) {
                     Column(Modifier.padding(14.dp)) {
                         Text("日期", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(DateFormatting.longDate(date, Locale.getDefault()), style = MaterialTheme.typography.titleMedium)
+                        Text(DateFormatting.longDate(date, locale), style = MaterialTheme.typography.titleMedium)
                     }
                 }
                 OutlinedTextField(

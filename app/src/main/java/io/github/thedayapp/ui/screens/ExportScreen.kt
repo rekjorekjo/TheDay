@@ -11,6 +11,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -83,6 +84,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import io.github.thedayapp.ui.currentJavaLocale
 import io.github.thedayapp.data.DayEvent
 import io.github.thedayapp.data.TheDayState
 import io.github.thedayapp.domain.DayMath
@@ -126,7 +128,7 @@ fun ExportScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val locale = Locale.getDefault()
+    val locale = currentJavaLocale()
 
     val visibleEvents = remember(
         state.events,
@@ -1044,10 +1046,7 @@ private fun ExportSortRow(
         } else {
             MaterialTheme.colorScheme.surface
         },
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
+        animationSpec = tween(durationMillis = 55),
         label = "exportSortHighlight",
     )
 

@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.thedayapp.ui.currentJavaLocale
 import io.github.thedayapp.data.DayEvent
 import io.github.thedayapp.data.LocalImageReference
 import io.github.thedayapp.ui.media.localImageAlignment
@@ -56,7 +57,7 @@ fun CategoryScreen(
     onOpenCategory: (String) -> Unit,
     bottomBar: @Composable () -> Unit,
 ) {
-    val locale = Locale.getDefault()
+    val locale = currentJavaLocale()
     val categories = remember(events, locale) {
         val grouped = events
             .groupBy { event -> normalizedCategoryName(event.category) }

@@ -60,6 +60,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import io.github.thedayapp.ui.currentJavaLocale
 import io.github.thedayapp.data.TheDayState
 import io.github.thedayapp.domain.DayMath
 import io.github.thedayapp.domain.EventOrdering
@@ -87,7 +88,7 @@ fun HomeScreen(
     onOpenTools: () -> Unit,
     bottomBar: @Composable () -> Unit,
 ) {
-    val locale = Locale.getDefault()
+    val locale = currentJavaLocale()
     var filter by remember { mutableStateOf(HomeFilter.ALL) }
     var selectedCategories by remember { mutableStateOf<Set<String>>(emptySet()) }
     var filtersExpanded by rememberSaveable { mutableStateOf(false) }

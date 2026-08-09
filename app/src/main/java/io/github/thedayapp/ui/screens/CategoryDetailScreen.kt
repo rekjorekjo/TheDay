@@ -10,7 +10,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -22,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -34,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import io.github.thedayapp.ui.currentJavaLocale
 import io.github.thedayapp.R
 import io.github.thedayapp.data.TheDayState
 import io.github.thedayapp.domain.EventOrdering
@@ -54,7 +58,7 @@ fun CategoryDetailScreen(
     onOpenEvent: (String) -> Unit,
 ) {
     val context = LocalContext.current
-    val locale = Locale.getDefault()
+    val locale = currentJavaLocale()
     val categoryEvents = remember(state.events, categoryName) {
         state.events.filter { event ->
             normalizedCategoryName(event.category) == categoryName
@@ -76,6 +80,7 @@ fun CategoryDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var coverMenuExpanded by remember { mutableStateOf(false) }
     var isImportingCover by remember { mutableStateOf(false) }
+    var deleteDialogVisible by remember { mutableStateOf(false) }
 
     val launchCoverPicker = rememberSingleImagePickerLauncher(
         onImagePicked = { selection ->
@@ -183,6 +188,30 @@ fun CategoryDetailScreen(
         },
     )
 
+    if (deleteDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { deleteDialogVisible = false },
+            title = { Text("删除分类") },
+            text = { Text("删除“$categoryName”分类？分类中的日子不会被删除，只会变为未分类。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deleteDialogVisible = false
+                        state.deleteCategory(categoryName)
+                        onBack()
+                    },
+                ) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteDialogVisible = false }) {
+                    Text("取消")
+                }
+            },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -199,6 +228,18 @@ fun CategoryDetailScreen(
                     }
                 },
                 actions = {
+                    if (categoryName != "未分类") {
+                        IconButton(
+                            onClick = { deleteDialogVisible = true },
+                            enabled = !isImportingCover,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Delete,
+                                contentDescription = "删除分类",
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
                     Box {
                         if (isImportingCover) {
                             Box(

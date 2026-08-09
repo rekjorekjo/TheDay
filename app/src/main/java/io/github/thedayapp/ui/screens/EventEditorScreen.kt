@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import io.github.thedayapp.ui.currentJavaLocale
 import io.github.thedayapp.R
 import io.github.thedayapp.data.DayEvent
 import io.github.thedayapp.data.LocalImageReference
@@ -106,7 +107,7 @@ fun EventEditorScreen(
     onReleaseBackgroundImage: (LocalImageReference?) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val locale = Locale.getDefault()
+    val locale = currentJavaLocale()
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val isNewEvent = existing == null
