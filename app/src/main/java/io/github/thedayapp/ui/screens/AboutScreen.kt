@@ -228,6 +228,8 @@ private fun UpdateSection() {
                 when (downloadStatus.state) {
                     UpdateDownloadState.NONE, UpdateDownloadState.FAILED -> {
                         coroutineScope.launch {
+                            updateManager.resetFailedDownloadForManualCheck()
+                            downloadStatus = updateManager.currentStatus()
                             isChecking = true
                             checkMessage = null
 
@@ -402,6 +404,8 @@ private fun getStatusText(
 ): String {
     return when {
         isChecking -> context.getString(R.string.update_checking)
+        checkMessage == context.getString(R.string.update_failed) -> context.getString(R.string.update_failed)
+        checkMessage == context.getString(R.string.update_upto_date) -> context.getString(R.string.update_upto_date)
         downloadStatus.state == UpdateDownloadState.WAITING -> context.getString(R.string.update_waiting_network)
         downloadStatus.state == UpdateDownloadState.DOWNLOADING -> {
             val progressPercent = downloadStatus.progressPercent
@@ -414,7 +418,6 @@ private fun getStatusText(
         downloadStatus.state == UpdateDownloadState.VERIFYING -> context.getString(R.string.update_verifying)
         downloadStatus.state == UpdateDownloadState.READY -> context.getString(R.string.update_install_button)
         downloadStatus.state == UpdateDownloadState.FAILED -> context.getString(R.string.update_download_failed)
-        checkMessage != null && checkMessage == context.getString(R.string.update_failed) -> context.getString(R.string.update_failed)
         else -> context.getString(R.string.update_upto_date)
     }
 }

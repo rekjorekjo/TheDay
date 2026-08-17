@@ -1,5 +1,6 @@
 package io.github.thedayapp
 
+import android.Manifest
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -10,9 +11,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.thedayapp.data.TheDayState
+import io.github.thedayapp.notification.InitialNotificationPermission
 import io.github.thedayapp.ui.AppEntry
 import io.github.thedayapp.update.UpdateActions
 import io.github.thedayapp.update.AppUpdateManager
+import io.github.thedayapp.update.StartupUpdateChecker
 import io.github.thedayapp.update.UpdatePreferences
 
 class MainActivity : ComponentActivity() {
@@ -39,6 +42,20 @@ class MainActivity : ComponentActivity() {
                 requestedEventId = openEventId,
                 onRequestedEventConsumed = { openEventId = null },
             )
+        }
+
+        requestInitialNotificationPermissionIfNeeded()
+        StartupUpdateChecker.check(this)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_INITIAL_NOTIFICATIONS) {
+            StartupUpdateChecker.check(this)
         }
     }
 
@@ -86,6 +103,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun requestInitialNotificationPermissionIfNeeded() {
+        if (!InitialNotificationPermission.shouldRequest(this)) return
+        InitialNotificationPermission.markRequested(this)
+        window.decorView.post {
+            if (!isFinishing && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                requestPermissions(
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    REQUEST_INITIAL_NOTIFICATIONS,
+                )
+            }
+        }
+    }
+
     private fun handleLaunchIntent(intent: Intent) {
         openEventId = intent.getStringExtra(EXTRA_OPEN_EVENT_ID)
 
@@ -120,5 +150,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_OPEN_EVENT_ID = "open_event_id"
         private const val ACTION_PIN_WIDGET = "io.github.thedayapp.action.PIN_WIDGET"
+        private const val REQUEST_INITIAL_NOTIFICATIONS = 7201
     }
 }

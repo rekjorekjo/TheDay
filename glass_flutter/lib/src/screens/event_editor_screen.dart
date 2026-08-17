@@ -420,14 +420,19 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
                             child: Text('移除图片', style: TextStyle(color: scheme.error)),
                           ),
                         ],
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text('管理'),
-                              SizedBox(width: 2),
-                              Icon(Icons.arrow_drop_down_rounded),
+                              Text(
+                                '管理',
+                                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                      color: scheme.primary,
+                                    ),
+                              ),
+                              const SizedBox(width: 2),
+                              Icon(Icons.arrow_drop_down_rounded, color: scheme.primary),
                             ],
                           ),
                         ),
@@ -501,9 +506,15 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(reminderDays < 0 ? '不提醒' : reminderText(reminderDays)),
+                            Text(
+                              reminderDays < 0 ? '不提醒' : reminderText(reminderDays),
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
                             const SizedBox(width: 2),
-                            const Icon(Icons.arrow_drop_down_rounded),
+                            Icon(
+                              Icons.arrow_drop_down_rounded,
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ],
                         ),
                       ),

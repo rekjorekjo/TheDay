@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
 import '../glass_route.dart';
+import '../glass_theme.dart';
 import '../models.dart';
 import '../ui_utils.dart';
 import '../widgets/event_widgets.dart';
@@ -492,7 +493,13 @@ class _DetailHero extends StatelessWidget {
                           children: [
                             Text(
                               event.signedDays.abs().toString(),
-                              style: Theme.of(context).textTheme.displayLarge?.copyWith(color: primaryText),
+                              style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                                color: primaryText,
+                                shadows: glassDayCountGlow(
+                                  scheme.primary,
+                                  fontSize: Theme.of(context).textTheme.displayLarge?.fontSize ?? 58,
+                                ),
+                              ),
                             ),
                             Padding(
                               padding: const EdgeInsets.only(left: 6, bottom: 8),
@@ -562,7 +569,7 @@ class _DetailsMenu extends StatelessWidget {
     return PopupMenuButton<void>(
       tooltip: '详细信息',
       icon: const Icon(Icons.more_horiz_rounded),
-      constraints: const BoxConstraints(minWidth: 270, maxWidth: 340),
+      constraints: const BoxConstraints(minWidth: 320, maxWidth: 370),
       itemBuilder: (_) => [
         PopupMenuItem<void>(
           enabled: false,
@@ -598,17 +605,26 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: 300,
+        width: double.infinity,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(child: Text(label, style: Theme.of(context).textTheme.bodyMedium)),
-            const SizedBox(width: 10),
-            Flexible(
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 64,
+              child: Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
               child: Text(
                 value,
-                textAlign: TextAlign.end,
+                textAlign: TextAlign.start,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyMedium,

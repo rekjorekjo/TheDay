@@ -6,6 +6,20 @@ Color withOpacitySafe(Color color, double opacity) {
   return color.withAlpha(alpha);
 }
 
+List<Shadow> glassDayCountGlow(Color accent, {double fontSize = 58}) {
+  final inner = Color.lerp(accent, Colors.white, 0.20) ?? accent;
+  return <Shadow>[
+    Shadow(
+      color: accent.withAlpha(205),
+      blurRadius: fontSize * 0.16,
+    ),
+    Shadow(
+      color: inner.withAlpha(175),
+      blurRadius: fontSize * 0.065,
+    ),
+  ];
+}
+
 class PaletteAmbience {
   const PaletteAmbience({
     required this.primary,

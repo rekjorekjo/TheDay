@@ -11,6 +11,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.SweepGradient
 import android.text.TextPaint
 import io.github.thedayapp.data.DayEvent
 import io.github.thedayapp.data.ImagePlacementTarget
@@ -502,16 +503,25 @@ object BatchExportRenderer {
         val cardPath = Path().apply {
             addRoundRect(rect, rounding, rounding, Path.Direction.CW)
         }
+        val bitmap = loadEventBitmap(imageStore, event)
+        if (bitmap == null && glassStyle != null) {
+            drawGlassExportCardShadow(
+                canvas = canvas,
+                rect = rect,
+                radius = rounding,
+                style = glassStyle,
+                baseSize = min(rect.width(), rect.height()),
+            )
+        }
         val cardSurfacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = when {
-                event.backgroundImage != null -> withAlpha(palette.surface, if (palette.isDark) 28 else 18)
+                bitmap != null -> withAlpha(palette.surface, if (palette.isDark) 28 else 18)
                 glassStyle != null -> Color.TRANSPARENT
                 else -> withAlpha(palette.surface, if (palette.isDark) 74 else 38)
             }
         }
         canvas.drawPath(cardPath, cardSurfacePaint)
 
-        val bitmap = loadEventBitmap(imageStore, event)
         if (bitmap != null) {
             val saveCount = canvas.save()
             canvas.clipPath(cardPath)
@@ -541,16 +551,24 @@ object BatchExportRenderer {
             canvas.drawRect(rect, gradientPaint)
             canvas.restoreToCount(saveCount)
         } else if (glassStyle != null) {
-            val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = withAlpha(Color.WHITE, glassStyle.surfaceFillAlpha)
-            }
-            canvas.drawPath(cardPath, glassPaint)
-            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = withAlpha(Color.WHITE, glassStyle.borderAlpha)
-                style = Paint.Style.STROKE
-                strokeWidth = 2.2f
-            }
-            canvas.drawPath(cardPath, borderPaint)
+            drawGlassExportCardSurface(
+                canvas = canvas,
+                rect = rect,
+                radius = rounding,
+                style = glassStyle,
+            )
+            drawGlassExportCardOverlay(
+                canvas = canvas,
+                rect = rect,
+                radius = rounding,
+                style = glassStyle,
+            )
+            drawGlassExportCardDepth(
+                canvas = canvas,
+                rect = rect,
+                radius = rounding,
+                style = glassStyle,
+            )
         } else {
             val emptyBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = LinearGradient(
@@ -726,6 +744,219 @@ object BatchExportRenderer {
         }
     }
 
+    private fun drawGlassExportCardShadow(
+        canvas: Canvas,
+        rect: RectF,
+        radius: Float,
+        style: GlassExportStyle,
+        baseSize: Float,
+    ) {
+        val t = style.clarityFraction
+        val depthAlpha = 0.20f + ((0.095f - 0.20f) * t)
+        val tightAlpha = 0.16f + ((0.075f - 0.16f) * t)
+
+        canvas.drawRoundRect(
+            rect,
+            radius,
+            radius,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = withAlpha(Color.BLACK, 5)
+                setShadowLayer(
+                    baseSize * 0.032f,
+                    0f,
+                    baseSize * 0.017f,
+                    withAlpha(Color.BLACK, (depthAlpha * 255f).toInt()),
+                )
+            },
+        )
+        canvas.drawRoundRect(
+            rect,
+            radius,
+            radius,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = withAlpha(Color.BLACK, 2)
+                setShadowLayer(
+                    baseSize * 0.012f,
+                    0f,
+                    baseSize * 0.006f,
+                    withAlpha(Color.BLACK, (tightAlpha * 255f).toInt()),
+                )
+            },
+        )
+    }
+
+    private fun drawGlassExportCardSurface(
+        canvas: Canvas,
+        rect: RectF,
+        radius: Float,
+        style: GlassExportStyle,
+    ) {
+        val fillAlpha = style.surfaceFillAlpha
+        val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                rect.left,
+                rect.top,
+                rect.right,
+                rect.bottom,
+                intArrayOf(
+                    withAlpha(Color.WHITE, fillAlpha),
+                    withAlpha(style.accent, (fillAlpha * 0.18f).toInt()),
+                    withAlpha(Color.WHITE, (fillAlpha * 0.58f).toInt()),
+                ),
+                floatArrayOf(0f, 0.56f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRoundRect(rect, radius, radius, surfacePaint)
+    }
+
+    private fun drawGlassExportCardOverlay(
+        canvas: Canvas,
+        rect: RectF,
+        radius: Float,
+        style: GlassExportStyle,
+    ) {
+        val saveCount = canvas.save()
+        canvas.clipPath(Path().apply {
+            addRoundRect(rect, radius, radius, Path.Direction.CW)
+        })
+        val highlightRadius = min(rect.width(), rect.height()) * 0.52f
+        canvas.drawRect(
+            rect,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = android.graphics.RadialGradient(
+                    rect.left + rect.width() * 0.16f,
+                    rect.top + rect.height() * 0.12f,
+                    highlightRadius,
+                    intArrayOf(
+                        withAlpha(Color.WHITE, if (style.isDark) 22 else 34),
+                        Color.TRANSPARENT,
+                    ),
+                    floatArrayOf(0f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            },
+        )
+        canvas.drawRect(
+            rect,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    rect.left,
+                    rect.top,
+                    rect.right,
+                    rect.bottom,
+                    intArrayOf(
+                        Color.TRANSPARENT,
+                        withAlpha(Color.BLACK, if (style.isDark) 17 else 9),
+                    ),
+                    floatArrayOf(0.46f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            },
+        )
+        canvas.restoreToCount(saveCount)
+    }
+
+    private fun drawGlassExportCardDepth(
+        canvas: Canvas,
+        rect: RectF,
+        radius: Float,
+        style: GlassExportStyle,
+    ) {
+        val scale = (rect.width() / 400f).coerceIn(1f, 4f)
+        val t = style.clarityFraction
+        val edgeAlpha = 0.35f + ((0.275f - 0.35f) * t)
+
+        fun insetRect(amount: Float): RectF = RectF(
+            rect.left + amount,
+            rect.top + amount,
+            rect.right - amount,
+            rect.bottom - amount,
+        )
+
+        val outerInset = 0.52f * scale
+        val outerRect = insetRect(outerInset)
+        canvas.drawRoundRect(
+            outerRect,
+            (radius - outerInset).coerceAtLeast(0f),
+            (radius - outerInset).coerceAtLeast(0f),
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.style = Paint.Style.STROKE
+                strokeWidth = 1.04f * scale
+                shader = LinearGradient(
+                    outerRect.left,
+                    outerRect.top,
+                    outerRect.right,
+                    outerRect.bottom,
+                    intArrayOf(
+                        withAlpha(Color.WHITE, (edgeAlpha * 255f).toInt()),
+                        withAlpha(Color.WHITE, (edgeAlpha * 0.72f * 255f).toInt()),
+                        withAlpha(style.accent, (edgeAlpha * 0.46f * 255f).toInt()),
+                        withAlpha(Color.WHITE, (edgeAlpha * 0.13f * 255f).toInt()),
+                    ),
+                    floatArrayOf(0f, 0.24f, 0.58f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            },
+        )
+
+        val refractInset = 1.28f * scale
+        val refractRect = insetRect(refractInset)
+        if (refractRect.width() > 0f && refractRect.height() > 0f) {
+            canvas.drawRoundRect(
+                refractRect,
+                (radius - refractInset).coerceAtLeast(0f),
+                (radius - refractInset).coerceAtLeast(0f),
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.style = Paint.Style.STROKE
+                    strokeWidth = 0.72f * scale
+                    shader = SweepGradient(
+                        refractRect.centerX(),
+                        refractRect.centerY(),
+                        intArrayOf(
+                            withAlpha(Color.WHITE, 11),
+                            withAlpha(Color.WHITE, 48),
+                            withAlpha(style.accent, 24),
+                            Color.TRANSPARENT,
+                            withAlpha(Color.BLACK, 18),
+                            Color.TRANSPARENT,
+                            withAlpha(Color.WHITE, 31),
+                            withAlpha(Color.WHITE, 11),
+                        ),
+                        floatArrayOf(0f, 0.10f, 0.19f, 0.34f, 0.53f, 0.69f, 0.88f, 1f),
+                    )
+                },
+            )
+        }
+
+        val innerInset = 1.88f * scale
+        val innerRect = insetRect(innerInset)
+        if (innerRect.width() > 0f && innerRect.height() > 0f) {
+            canvas.drawRoundRect(
+                innerRect,
+                (radius - innerInset).coerceAtLeast(0f),
+                (radius - innerInset).coerceAtLeast(0f),
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.style = Paint.Style.STROKE
+                    strokeWidth = 0.56f * scale
+                    shader = LinearGradient(
+                        innerRect.left,
+                        innerRect.top,
+                        innerRect.right,
+                        innerRect.bottom,
+                        intArrayOf(
+                            withAlpha(Color.WHITE, if (style.isDark) 37 else 51),
+                            Color.TRANSPARENT,
+                            withAlpha(Color.BLACK, if (style.isDark) 29 else 17),
+                        ),
+                        floatArrayOf(0f, 0.48f, 1f),
+                        Shader.TileMode.CLAMP,
+                    )
+                },
+            )
+        }
+    }
+
     private fun drawListRow(
         canvas: Canvas,
         rect: RectF,
@@ -735,21 +966,37 @@ object BatchExportRenderer {
         palette: MemoryImagePalette,
         glassStyle: GlassExportStyle?,
     ) {
-        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (glassStyle != null) {
-                withAlpha(Color.WHITE, glassStyle.surfaceFillAlpha)
-            } else {
-                withAlpha(palette.surface, if (palette.isDark) 214 else 240)
-            }
-        }
-        canvas.drawRoundRect(rect, 28f, 28f, cardPaint)
         if (glassStyle != null) {
-            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = withAlpha(Color.WHITE, glassStyle.borderAlpha)
-                style = Paint.Style.STROKE
-                strokeWidth = 2f
+            drawGlassExportCardShadow(
+                canvas = canvas,
+                rect = rect,
+                radius = 28f,
+                style = glassStyle,
+                baseSize = 390f,
+            )
+            drawGlassExportCardSurface(
+                canvas = canvas,
+                rect = rect,
+                radius = 28f,
+                style = glassStyle,
+            )
+            drawGlassExportCardOverlay(
+                canvas = canvas,
+                rect = rect,
+                radius = 28f,
+                style = glassStyle,
+            )
+            drawGlassExportCardDepth(
+                canvas = canvas,
+                rect = rect,
+                radius = 28f,
+                style = glassStyle,
+            )
+        } else {
+            val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = withAlpha(palette.surface, if (palette.isDark) 214 else 240)
             }
-            canvas.drawRoundRect(rect, 28f, 28f, borderPaint)
+            canvas.drawRoundRect(rect, 28f, 28f, cardPaint)
         }
 
         val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

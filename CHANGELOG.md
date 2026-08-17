@@ -1,5 +1,55 @@
 # Changelog
 
+## 3.2.1 - Heads-up update alerts and Glass polish
+
+- Rebalanced the Glass detail-info popup so labels stay compact without starving long values of horizontal space.
+- Extended the no-image Liquid Glass card depth treatment to Glass long-image and list exports.
+
+- Simplified the automatic update notification text and moved update-available alerts to a fresh high-importance channel with explicit notification sound/vibration so supported Android devices can present them as heads-up notifications.
+- Improved Glass memorial images without a source photo by restoring card depth shadows and adding layered outer, refractive and inner transmission rims plus subtle optical highlights.
+- Fixed the Glass memorial renderer Kotlin compile error caused by a Paint/Glass style name collision.
+- Fixed manual update checks remaining stuck on a persisted failed-download state; a user retry now clears only the stale failed download and performs a fresh network check.
+
+## 3.2.0 - Background update checks and Glass widget setup
+
+- Fixed the Classic notification permission callback signature for current AndroidX ComponentActivity Kotlin compilation.
+
+- Check for updates in the background when the launcher activity starts; a newer release posts a system notification but never starts an APK download automatically.
+- Ask for notification permission once on a fresh Android 13+ install. The current photo picker and media APIs continue without broad storage permission.
+- Redesign the Glass special-day widget configuration screen with the selected Glass palette/motion backdrop frozen at a static phase and with texture overlays disabled.
+- Fix dark text leaking into the Glass special-day widget configuration screen.
+- Fix stale single-event memorial previews after palette changes while restoring the memorial-number glow to its original strength.
+- Add the same palette-accent day-count glow used by memorial images to the large day number on the Glass Home hero and event detail card.
+
+## 3.1.3 - Glass texture and image interaction polish
+
+- Brightened Galaxy stars and refined Snowflakes into recognizable snowflake shapes.
+- Made Snowflakes and Rain fall continuously without periodic scene refreshes, then slowed both by about 35%.
+- Added periodic depth variation to Hearts.
+- Improved image-position adjustment performance and added longer single-edge highlight feedback at movement limits.
+- Fixed warning-style text appearing in the event editor.
+- Made `release-notes.md` the single human-edited source for APK update notes; Gradle now regenerates `update_notes.txt` before every build.
+
+## 3.1.2 - Continuous weather textures
+
+- Brightened Galaxy stars with soft halos and more visible flares so the texture reads as glowing stars rather than dim dots.
+- Reworked the larger Snowflakes into six-arm snowflake shapes while retaining subtle distant snow points for depth.
+- Made Snowflakes use mathematically seamless falling trajectories: flakes recycle only after leaving the viewport, with no whole-field refresh at the animation loop boundary.
+- Made Rain use the same seamless wrap model so rain streaks continue falling without a visible periodic jump.
+- Slowed both Snowflakes and Rain falling motion by about 35% for a calmer, more natural background pace.
+- Doubled the single-edge blocked-drag highlight duration so the boundary feedback is easier to notice without reintroducing shake.
+- Simplified blocked image-drag feedback to a short accent highlight on only the edge that has reached its movement limit, removing the horizontal shake and whole-frame flash.
+- Updated the native Glass export renderer to mirror the revised Galaxy, Snowflakes and Rain visuals.
+
+## 3.1.1 - Glass interaction polish
+
+- Fixed Glass event editor popup selector labels falling back to Flutter's debug text style, which could render “管理” and reminder values as oversized red text with yellow double underlines.
+- Made the Hearts texture refresh periodically with changing positions, counts and varied opacity depth.
+- Removed the old top-to-bottom texture visibility bias and the Snowflakes bottom accumulation fade so texture strength stays more uniform across the viewport.
+- Reworked Flutter image placement to use the same overflow/focus model as the native renderer, including panning after zoom even when the source aspect ratio matches the viewport.
+- Isolated live image-transform updates to the preview, switches to lower filter quality while touching the image, and prevents the parent page from scrolling during image interaction.
+- Added a short accent-border pulse when the user tries to drag in a direction with no remaining image travel.
+
 ## 3.0.0 - Dual Edition foundation
 
 - Glass final visual pass uses a dark-only Liquid Glass system with 16 palettes and three background modes: Static, a 36-second three-light Flow orbit around the outer edge, and Aurora reusing the same low-cost three-light engine while moving the orbit into the content area and giving each light a distinct elliptical aspect, rotation and slow organic shape breathing without changing the dark base; six full-screen textures remain available: Pure, Rain, Snowflakes, Meteors, Galaxy and Hearts. Rain uses fine drifting rain streaks, while Snowflakes uses gently falling flakes over the dark Glass background; Meteors streak downward from the upper screen; Galaxy keeps the previous constellation-style points and connecting lines. Layered glass rims and preserved depth shadows remain available.

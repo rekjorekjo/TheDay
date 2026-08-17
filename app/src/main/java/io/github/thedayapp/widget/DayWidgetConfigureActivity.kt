@@ -3,12 +3,13 @@ package io.github.thedayapp.widget
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
+import android.graphics.RectF
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,8 +35,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +52,8 @@ import io.github.thedayapp.data.ThemeMode
 import io.github.thedayapp.domain.DayMath
 import io.github.thedayapp.domain.EventOrdering
 import io.github.thedayapp.domain.normalizedCategoryName
+import io.github.thedayapp.sharing.GlassExportBackdrop
+import io.github.thedayapp.sharing.GlassExportStyle
 import io.github.thedayapp.ui.currentJavaLocale
 import io.github.thedayapp.ui.theme.TheDayTheme
 import io.github.thedayapp.util.DateFormatting
@@ -210,31 +214,39 @@ private fun GlassDayWidgetConfigureScreen(
         fill = Color.White.copy(alpha = (if (dark) 0.30f else 0.48f) * fade * fade),
         border = Color.White.copy(alpha = 0.28f + ((0.24f - 0.28f) * clarity)),
         accent = ambience.accent,
+        foreground = Color.White.copy(alpha = 0.94f),
+        secondary = Color.White.copy(alpha = 0.70f),
     )
-    val baseTop = if (dark) Color(0xFF121A2D) else Color(0xFFEAF2F8)
-    val baseBottom = if (dark) Color(0xFF0B111E) else Color(0xFFDCE7EE)
-    val background = Brush.linearGradient(
-        colors = listOf(
-            baseTop,
-            ambience.primary.copy(alpha = if (dark) 0.82f else 0.62f),
-            ambience.secondary.copy(alpha = if (dark) 0.72f else 0.54f),
-            ambience.tertiary.copy(alpha = if (dark) 0.65f else 0.46f),
-            baseBottom,
-        ),
+    val exportStyle = GlassExportStyle(
+        primary = ambience.primary.toArgb(),
+        secondary = ambience.secondary.toArgb(),
+        tertiary = ambience.tertiary.toArgb(),
+        accent = ambience.accent.toArgb(),
+        clarity = settings.glassClarity,
+        isDark = true,
+        backgroundPhase = 0.18f,
+        backgroundMode = settings.backgroundMotionMode,
+        backgroundTexture = "NONE",
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(background),
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            GlassExportBackdrop.draw(
+                canvas = drawContext.canvas.nativeCanvas,
+                rect = RectF(0f, 0f, size.width, size.height),
+                style = exportStyle,
+            )
+        }
         Scaffold(
             containerColor = Color.Transparent,
+            contentColor = glassSpec.foreground,
             topBar = {
                 TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,
                         scrolledContainerColor = Color.Transparent,
+                        titleContentColor = glassSpec.foreground,
+                        navigationIconContentColor = glassSpec.foreground,
                     ),
                     title = {
                         Text(
@@ -286,12 +298,14 @@ private fun DayWidgetConfigureContent(
             Text(
                 text = "还没有可选择的日子",
                 style = MaterialTheme.typography.titleMedium,
+                color = if (glass) glassSpec?.foreground ?: Color.White else Color.Unspecified,
             )
             Text(
                 text = "请先打开 The Day 创建一个日子，再从桌面添加小组件。",
                 modifier = Modifier.padding(top = 8.dp),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (glass) glassSpec?.secondary ?: Color.White.copy(alpha = 0.70f)
+                else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     } else {
@@ -340,7 +354,8 @@ private fun DayWidgetEventItem(
         DayMath.effectiveDate(event, today),
         locale,
     )
-    val categoryColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val categoryColor = if (glass) glassSpec?.secondary ?: Color.White.copy(alpha = 0.70f)
+    else MaterialTheme.colorScheme.onSurfaceVariant
     val shape = RoundedCornerShape(if (glass) 22.dp else 20.dp)
 
     Card(
@@ -370,6 +385,7 @@ private fun DayWidgetEventItem(
                     }
                 },
                 style = MaterialTheme.typography.titleMedium,
+                color = if (glass) glassSpec?.foreground ?: Color.White else Color.Unspecified,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -382,7 +398,8 @@ private fun DayWidgetEventItem(
             Text(
                 text = dateText,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (glass) glassSpec?.secondary ?: Color.White.copy(alpha = 0.70f)
+                else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -392,6 +409,8 @@ private data class WidgetGlassSpec(
     val fill: Color,
     val border: Color,
     val accent: Color,
+    val foreground: Color,
+    val secondary: Color,
 )
 
 private data class WidgetGlassAmbience(

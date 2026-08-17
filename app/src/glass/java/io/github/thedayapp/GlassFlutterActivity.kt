@@ -19,6 +19,7 @@ import io.github.thedayapp.data.LocalImageReference
 import io.github.thedayapp.media.LocalImageStore
 import io.github.thedayapp.data.PaletteStyle
 import io.github.thedayapp.data.TheDayState
+import io.github.thedayapp.notification.InitialNotificationPermission
 import io.github.thedayapp.sharing.BatchExportRenderer
 import io.github.thedayapp.sharing.EventShareActions
 import io.github.thedayapp.sharing.EventMemoryImageRenderer
@@ -29,6 +30,7 @@ import io.github.thedayapp.sharing.MemoryImageTemplatePreferences
 import io.github.thedayapp.ui.glass.GlassStateJson
 import io.github.thedayapp.ui.media.EdgeHandleUCropActivity
 import io.github.thedayapp.update.AppUpdateManager
+import io.github.thedayapp.update.StartupUpdateChecker
 import io.github.thedayapp.update.UpdateCheckResult
 import io.github.thedayapp.update.UpdateDownloadState
 import io.github.thedayapp.update.UpdatePreferences
@@ -70,6 +72,9 @@ class GlassFlutterActivity : FlutterActivity() {
             window.isNavigationBarContrastEnforced = false
             window.isStatusBarContrastEnforced = false
         }
+
+        requestInitialNotificationPermissionIfNeeded()
+        StartupUpdateChecker.check(this)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -633,9 +638,18 @@ class GlassFlutterActivity : FlutterActivity() {
                 result.error("render_failed", it.message, null)
                 return@launch
             }
-            val file = File(cacheDir, "glass-memory-preview-${event.id}-${template.name}.png")
+            val previewPrefix = "glass-memory-preview-${event.id}-${template.name}-"
+            val file = File(
+                cacheDir,
+                "$previewPrefix${System.nanoTime()}.png",
+            )
             val saved = runCatching {
                 withContext(Dispatchers.IO) {
+                    cacheDir.listFiles { candidate ->
+                        candidate.name.startsWith(previewPrefix) && candidate != file
+                    }?.forEach { candidate ->
+                        runCatching { candidate.delete() }
+                    }
                     file.outputStream().buffered().use { output ->
                         if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
                             throw IOException("Could not encode preview image")
@@ -722,6 +736,7 @@ class GlassFlutterActivity : FlutterActivity() {
 
     private fun checkForUpdate(result: MethodChannel.Result) {
         activityScope.launch {
+            updateManager.resetFailedDownloadForManualCheck()
             val extra = when (val check = updateManager.checkForUpdate()) {
                 is UpdateCheckResult.UpdateAvailable -> {
                     if (updateManager.startDownload(check.release)) {
@@ -945,6 +960,19 @@ class GlassFlutterActivity : FlutterActivity() {
         pendingSourceTemporary = false
     }
 
+    private fun requestInitialNotificationPermissionIfNeeded() {
+        if (!InitialNotificationPermission.shouldRequest(this)) return
+        InitialNotificationPermission.markRequested(this)
+        window.decorView.post {
+            if (!isFinishing && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                requestPermissions(
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    REQUEST_INITIAL_NOTIFICATIONS,
+                )
+            }
+        }
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -955,6 +983,9 @@ class GlassFlutterActivity : FlutterActivity() {
             notificationPermissionResult?.success(notificationGranted())
             notificationPermissionResult = null
             channel?.invokeMethod("stateChanged", snapshot())
+        } else if (requestCode == REQUEST_INITIAL_NOTIFICATIONS) {
+            channel?.invokeMethod("stateChanged", snapshot())
+            StartupUpdateChecker.check(this)
         }
     }
 
@@ -1015,6 +1046,7 @@ class GlassFlutterActivity : FlutterActivity() {
         private const val REQUEST_NOTIFICATIONS = 7101
         private const val REQUEST_PICK_IMAGE = 7102
         private const val REQUEST_CROP_IMAGE = 7103
+        private const val REQUEST_INITIAL_NOTIFICATIONS = 7104
 
         fun createIntent(context: android.content.Context, eventId: String? = null): Intent {
             return Intent(context, GlassFlutterActivity::class.java).apply {

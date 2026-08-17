@@ -11,6 +11,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.SweepGradient
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
@@ -416,7 +417,15 @@ object EventMemoryImageRenderer {
                 random = random,
                 glassStyle = glassStyle,
             )
-            if (glassStyle == null || hasBackgroundImage) {
+            if (!hasBackgroundImage && glassStyle != null) {
+                drawGlassCardShadowLayer(
+                    canvas = canvas,
+                    cardRect = cardRect,
+                    cardRadius = cardRadius,
+                    style = glassStyle,
+                    baseSize = baseSize,
+                )
+            } else {
                 drawCardShadowLayer(
                     canvas = canvas,
                     cardRect = cardRect,
@@ -471,24 +480,31 @@ object EventMemoryImageRenderer {
             )
             canvas.restoreToCount(cardSaveCount)
 
-            val borderColor = if (!hasBackgroundImage && glassStyle != null) {
-                withAlpha(Color.WHITE, glassStyle.borderAlpha)
-            } else if (palette.isDark) {
-                withAlpha(palette.primary, 112)
+            if (!hasBackgroundImage && glassStyle != null) {
+                drawGlassCardDepth(
+                    canvas = canvas,
+                    cardRect = cardRect,
+                    cardRadius = cardRadius,
+                    style = glassStyle,
+                )
             } else {
-                withAlpha(palette.primary, 132)
+                val borderColor = if (palette.isDark) {
+                    withAlpha(palette.primary, 112)
+                } else {
+                    withAlpha(palette.primary, 132)
+                }
+                val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = borderColor
+                    this.style = Paint.Style.STROKE
+                    strokeWidth = cardBorderWidth
+                }
+                canvas.drawRoundRect(
+                    cardRect,
+                    cardRadius,
+                    cardRadius,
+                    borderPaint,
+                )
             }
-            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = borderColor
-                style = Paint.Style.STROKE
-                strokeWidth = cardBorderWidth
-            }
-            canvas.drawRoundRect(
-                cardRect,
-                cardRadius,
-                cardRadius,
-                borderPaint,
-            )
 
             return output
         } catch (exception: Exception) {
@@ -621,6 +637,143 @@ object EventMemoryImageRenderer {
         }
         val shadowRect = RectF(cardRect)
         canvas.drawRoundRect(shadowRect, cardRadius, cardRadius, shadowPaint)
+    }
+
+    private fun drawGlassCardShadowLayer(
+        canvas: Canvas,
+        cardRect: RectF,
+        cardRadius: Float,
+        style: GlassExportStyle,
+        baseSize: Float,
+    ) {
+        val t = style.clarityFraction
+        val depthAlpha = 0.20f + ((0.095f - 0.20f) * t)
+        val tightAlpha = 0.16f + ((0.075f - 0.16f) * t)
+
+        val depthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = withAlpha(Color.BLACK, 5)
+            setShadowLayer(
+                baseSize * 0.032f,
+                0f,
+                baseSize * 0.017f,
+                withAlpha(Color.BLACK, (depthAlpha * 255f).roundToInt()),
+            )
+        }
+        canvas.drawRoundRect(cardRect, cardRadius, cardRadius, depthPaint)
+
+        val tightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = withAlpha(Color.BLACK, 2)
+            setShadowLayer(
+                baseSize * 0.012f,
+                0f,
+                baseSize * 0.006f,
+                withAlpha(Color.BLACK, (tightAlpha * 255f).roundToInt()),
+            )
+        }
+        canvas.drawRoundRect(cardRect, cardRadius, cardRadius, tightPaint)
+    }
+
+    private fun drawGlassCardDepth(
+        canvas: Canvas,
+        cardRect: RectF,
+        cardRadius: Float,
+        style: GlassExportStyle,
+    ) {
+        val scale = (cardRect.width() / 400f).coerceIn(1f, 4f)
+        val t = style.clarityFraction
+        val edgeAlpha = 0.35f + ((0.275f - 0.35f) * t)
+
+        fun insetRect(amount: Float): RectF = RectF(
+            cardRect.left + amount,
+            cardRect.top + amount,
+            cardRect.right - amount,
+            cardRect.bottom - amount,
+        )
+
+        val outerInset = 0.52f * scale
+        val outerRect = insetRect(outerInset)
+        val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.style = Paint.Style.STROKE
+            strokeWidth = 1.04f * scale
+            shader = LinearGradient(
+                outerRect.left,
+                outerRect.top,
+                outerRect.right,
+                outerRect.bottom,
+                intArrayOf(
+                    withAlpha(Color.WHITE, (edgeAlpha * 255f).roundToInt()),
+                    withAlpha(Color.WHITE, (edgeAlpha * 0.72f * 255f).roundToInt()),
+                    withAlpha(style.accent, (edgeAlpha * 0.46f * 255f).roundToInt()),
+                    withAlpha(Color.WHITE, (edgeAlpha * 0.13f * 255f).roundToInt()),
+                ),
+                floatArrayOf(0f, 0.24f, 0.58f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRoundRect(
+            outerRect,
+            (cardRadius - outerInset).coerceAtLeast(0f),
+            (cardRadius - outerInset).coerceAtLeast(0f),
+            outerPaint,
+        )
+
+        val refractInset = 1.28f * scale
+        val refractRect = insetRect(refractInset)
+        if (refractRect.width() > 0f && refractRect.height() > 0f) {
+            val refractPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.style = Paint.Style.STROKE
+                strokeWidth = 0.72f * scale
+                shader = SweepGradient(
+                    refractRect.centerX(),
+                    refractRect.centerY(),
+                    intArrayOf(
+                        withAlpha(Color.WHITE, 11),
+                        withAlpha(Color.WHITE, 48),
+                        withAlpha(style.accent, 24),
+                        Color.TRANSPARENT,
+                        withAlpha(Color.BLACK, 18),
+                        Color.TRANSPARENT,
+                        withAlpha(Color.WHITE, 31),
+                        withAlpha(Color.WHITE, 11),
+                    ),
+                    floatArrayOf(0f, 0.10f, 0.19f, 0.34f, 0.53f, 0.69f, 0.88f, 1f),
+                )
+            }
+            canvas.drawRoundRect(
+                refractRect,
+                (cardRadius - refractInset).coerceAtLeast(0f),
+                (cardRadius - refractInset).coerceAtLeast(0f),
+                refractPaint,
+            )
+        }
+
+        val innerInset = 1.88f * scale
+        val innerRect = insetRect(innerInset)
+        if (innerRect.width() > 0f && innerRect.height() > 0f) {
+            val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.style = Paint.Style.STROKE
+                strokeWidth = 0.56f * scale
+                shader = LinearGradient(
+                    innerRect.left,
+                    innerRect.top,
+                    innerRect.right,
+                    innerRect.bottom,
+                    intArrayOf(
+                        withAlpha(Color.WHITE, if (style.isDark) 37 else 51),
+                        Color.TRANSPARENT,
+                        withAlpha(Color.BLACK, if (style.isDark) 29 else 17),
+                    ),
+                    floatArrayOf(0f, 0.48f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.drawRoundRect(
+                innerRect,
+                (cardRadius - innerInset).coerceAtLeast(0f),
+                (cardRadius - innerInset).coerceAtLeast(0f),
+                innerPaint,
+            )
+        }
     }
 
     private fun drawMiddleLayerText(
@@ -799,9 +952,11 @@ object EventMemoryImageRenderer {
                 Color.TRANSPARENT,
             )
         } else if (glassStyle != null) {
+            val fillAlpha = glassStyle.surfaceFillAlpha
             intArrayOf(
-                withAlpha(Color.WHITE, glassStyle.surfaceFillAlpha),
-                withAlpha(Color.WHITE, (glassStyle.surfaceFillAlpha * 0.72f).roundToInt()),
+                withAlpha(Color.WHITE, fillAlpha),
+                withAlpha(glassStyle.accent, (fillAlpha * 0.18f).roundToInt()),
+                withAlpha(Color.WHITE, (fillAlpha * 0.58f).roundToInt()),
             )
         } else {
             intArrayOf(
@@ -809,7 +964,11 @@ object EventMemoryImageRenderer {
                 withAlpha(palette.surface, if (palette.isDark) 12 else 8),
             )
         }
-        val stops = floatArrayOf(0f, 1f)
+        val stops = if (!hasBackgroundImage && glassStyle != null) {
+            floatArrayOf(0f, 0.56f, 1f)
+        } else {
+            floatArrayOf(0f, 1f)
+        }
         val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 cardRect.left,
@@ -831,7 +990,40 @@ object EventMemoryImageRenderer {
         hasBackgroundImage: Boolean,
         glassStyle: GlassExportStyle?,
     ) {
-        if (!hasBackgroundImage && glassStyle != null) return
+        if (!hasBackgroundImage && glassStyle != null) {
+            val highlightRadius = min(cardRect.width(), cardRect.height()) * 0.52f
+            val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = android.graphics.RadialGradient(
+                    cardRect.left + cardRect.width() * 0.16f,
+                    cardRect.top + cardRect.height() * 0.12f,
+                    highlightRadius,
+                    intArrayOf(
+                        withAlpha(Color.WHITE, if (glassStyle.isDark) 22 else 34),
+                        Color.TRANSPARENT,
+                    ),
+                    floatArrayOf(0f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.drawRect(cardRect, highlightPaint)
+
+            val transmissionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    cardRect.left,
+                    cardRect.top,
+                    cardRect.right,
+                    cardRect.bottom,
+                    intArrayOf(
+                        Color.TRANSPARENT,
+                        withAlpha(Color.BLACK, if (glassStyle.isDark) 17 else 9),
+                    ),
+                    floatArrayOf(0.46f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.drawRect(cardRect, transmissionPaint)
+            return
+        }
 
         if (hasBackgroundImage) {
             val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1030,7 +1222,7 @@ object EventMemoryImageRenderer {
         }
         val baseStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.primary
-            style = Paint.Style.STROKE
+            this.style = Paint.Style.STROKE
             strokeWidth = baseSize * 0.003f
         }
 
@@ -1106,7 +1298,7 @@ object EventMemoryImageRenderer {
         val baseStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.primary
             strokeWidth = baseSize * 0.0025f
-            style = Paint.Style.STROKE
+            this.style = Paint.Style.STROKE
         }
 
         var largeOuterCount = 0
@@ -1229,15 +1421,15 @@ object EventMemoryImageRenderer {
 
         val primaryFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = roseColor
-            style = Paint.Style.FILL
+            this.style = Paint.Style.FILL
         }
         val softFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = softRoseColor
-            style = Paint.Style.FILL
+            this.style = Paint.Style.FILL
         }
         val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = roseColor
-            style = Paint.Style.STROKE
+            this.style = Paint.Style.STROKE
             strokeWidth = baseSize * 0.0026f
             strokeJoin = Paint.Join.ROUND
             strokeCap = Paint.Cap.ROUND
@@ -1377,7 +1569,7 @@ object EventMemoryImageRenderer {
             color = palette.primary
             strokeWidth = baseSize * 0.003f
             strokeCap = Paint.Cap.ROUND
-            style = Paint.Style.STROKE
+            this.style = Paint.Style.STROKE
         }
         val baseHeadPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.onSurfaceVariant
@@ -1430,12 +1622,12 @@ object EventMemoryImageRenderer {
         val basePrimaryPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.primary
             strokeWidth = baseSize * 0.0022f
-            style = Paint.Style.STROKE
+            this.style = Paint.Style.STROKE
         }
         val baseVariantPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.onSurfaceVariant
             strokeWidth = baseSize * 0.0018f
-            style = Paint.Style.STROKE
+            this.style = Paint.Style.STROKE
         }
 
         val width = cardRect.width()
@@ -1580,7 +1772,7 @@ object EventMemoryImageRenderer {
                     val radius = size * 1.2f
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = palette.primary
-                        style = Paint.Style.STROKE
+                        this.style = Paint.Style.STROKE
                         strokeWidth = baseSize * 0.002f
                         this.alpha = alpha
                     }
@@ -1602,7 +1794,7 @@ object EventMemoryImageRenderer {
                     )
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = palette.primary
-                        style = Paint.Style.STROKE
+                        this.style = Paint.Style.STROKE
                         strokeWidth = baseSize * 0.0018f
                         strokeCap = Paint.Cap.ROUND
                         this.alpha = alpha
@@ -1623,7 +1815,7 @@ object EventMemoryImageRenderer {
                     canvas.rotate(point.rotation, cx, cy)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = palette.primary
-                        style = Paint.Style.STROKE
+                        this.style = Paint.Style.STROKE
                         strokeWidth = baseSize * 0.0018f
                         strokeCap = Paint.Cap.ROUND
                         this.alpha = alpha

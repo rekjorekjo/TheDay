@@ -41,9 +41,3 @@ glass_flutter/build/
 glass_flutter/.flutter-plugins
 glass_flutter/.flutter-plugins-dependencies
 glass_flutter/.packages
-
-# Android release build output
-/app/release/
-
-# JVM crash / heap dumps
-*.hprof

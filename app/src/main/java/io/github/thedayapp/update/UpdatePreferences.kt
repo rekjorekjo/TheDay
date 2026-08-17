@@ -54,6 +54,10 @@ class UpdatePreferences(context: Context) {
         get() = preferences.getBoolean("pending_install_permission", false)
         set(value) = preferences.edit().putBoolean("pending_install_permission", value).apply()
 
+    var lastNotifiedAvailableVersion: String?
+        get() = preferences.getString("last_notified_available_version", null)
+        set(value) = preferences.edit().putString("last_notified_available_version", value).apply()
+
     fun clearPendingUpdate() {
         preferences.edit().apply {
             putLong("pending_download_id", -1)

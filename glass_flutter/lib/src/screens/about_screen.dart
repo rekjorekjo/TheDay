@@ -190,6 +190,14 @@ class _AboutScreenState extends State<AboutScreen> {
     }
     final status = updateStatus;
     if (status == null) return const Text('当前已是最新版本');
+
+    // A manual check result is newer information than a persisted download state.
+    // This prevents an old FAILED download from making every later successful
+    // check look like an immediate failure.
+    if (status.extra == 'UP_TO_DATE') return const Text('当前已是最新版本');
+    if (status.extra == 'CHECK_FAILED') return const Text('检查失败');
+    if (status.extra == 'DOWNLOAD_FAILED') return const Text('重试');
+
     switch (status.state) {
       case 'WAITING':
         return const Text('等待下载');
@@ -202,10 +210,6 @@ class _AboutScreenState extends State<AboutScreen> {
       case 'FAILED':
         return const Text('重试');
       default:
-        if (status.extra == 'UP_TO_DATE') return const Text('当前已是最新版本');
-        if (status.extra == 'CHECK_FAILED' || status.extra == 'DOWNLOAD_FAILED') {
-          return const Text('检查失败');
-        }
         return const Icon(Icons.chevron_right_rounded, size: 20);
     }
   }

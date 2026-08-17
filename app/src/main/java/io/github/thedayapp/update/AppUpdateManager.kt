@@ -129,6 +129,33 @@ class AppUpdateManager(context: Context) {
         )
 
     /**
+     * A failed DownloadManager request is persisted so the UI can report it,
+     * but it must not poison later manual checks. Clear only that stale failed
+     * download before the user explicitly retries/checks again.
+     */
+    fun resetFailedDownloadForManualCheck() {
+        if (currentStatus().state != UpdateDownloadState.FAILED) return
+
+        val failedDownloadId = preferences.pendingDownloadId
+        val failedAssetName = preferences.pendingAssetName
+
+        if (failedDownloadId != null) {
+            runCatching { downloadManager.remove(failedDownloadId) }
+        }
+
+        val downloadDirectory = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        if (downloadDirectory != null && failedAssetName != null) {
+            val failedFile = File(downloadDirectory, failedAssetName)
+            if (failedFile.exists() && !failedFile.delete()) {
+                Log.w(TAG, "Failed to delete stale failed update file")
+            }
+        }
+
+        preferences.clearPendingUpdate()
+        Log.i(TAG, "Cleared stale failed update before manual check")
+    }
+
+    /**
      * Classic -> Glass is an edition replacement, not a data import. Glass uses
      * the same application id and signing key, so Android keeps the existing
      * app-private data. Equal version codes are valid for an Android update and

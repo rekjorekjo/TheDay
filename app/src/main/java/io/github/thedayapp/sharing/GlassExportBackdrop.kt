@@ -194,10 +194,7 @@ object GlassExportBackdrop {
     private fun drawTexture(canvas: Canvas, rect: RectF, style: GlassExportStyle) {
         when (style.backgroundTexture) {
             "NONE" -> Unit
-            "WAVE" -> {
-                drawSnowBase(canvas, rect, style)
-                drawSnowMotion(canvas, rect, style)
-            }
+            "WAVE" -> drawSnowMotion(canvas, rect, style)
             "STARS" -> {
                 drawMeteorField(canvas, rect, style)
                 drawTransientMeteors(canvas, rect, style)
@@ -218,17 +215,20 @@ object GlassExportBackdrop {
             this.style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
         }
-        repeat(52) {
+        val travelSpan = rect.height() + 64f
+        repeat(52) { index ->
             val baseX = rect.left + random.nextFloat() * (rect.width() + 40f) - 20f
-            val baseY = rect.top + random.nextFloat() * (rect.height() + 36f) - 18f
-            val speed = 0.65f + random.nextFloat() * 0.95f
-            val y = rect.top + (((baseY - rect.top) + (rect.height() * phase * speed)) % (rect.height() + 44f)) - 22f
+            val baseOffset = random.nextFloat() * travelSpan
+            val fallCycles = if (index % 8 == 0) 2f else 1f
+            val windPhase = random.nextDouble() * PI * 2.0
+            val wind = (sin(windPhase + phase * PI * 2.0) * 1.8).toFloat()
+            val y = rect.top + ((baseOffset + phase * travelSpan * fallCycles) % travelSpan) - 32f
             val length = min(rect.width(), rect.height()) * (0.045f + random.nextFloat() * 0.028f)
             val dx = length * (0.16f + random.nextFloat() * 0.07f)
             val dy = length * (0.84f + random.nextFloat() * 0.08f)
             paint.strokeWidth = 0.9f + random.nextFloat() * 0.55f
             paint.color = textureColor(style, if (style.isDark) 34 else 22)
-            canvas.drawLine(baseX, y, baseX - dx, y + dy, paint)
+            canvas.drawLine(baseX + wind, y, baseX + wind - dx, y + dy, paint)
         }
 
         val mistCenterX = rect.left + rect.width() * 0.22f
@@ -256,57 +256,97 @@ object GlassExportBackdrop {
         )
     }
 
-    private fun drawSnowBase(canvas: Canvas, rect: RectF, style: GlassExportStyle) {
-        canvas.drawRect(
-            RectF(rect.left, rect.top + rect.height() * 0.70f, rect.right, rect.bottom),
+    private fun drawSnowflake(canvas: Canvas, centerX: Float, centerY: Float, radius: Float, alpha: Int) {
+        val glowRadius = radius * 1.9f
+        canvas.drawCircle(
+            centerX,
+            centerY,
+            glowRadius,
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = LinearGradient(
-                    rect.left,
-                    rect.top + rect.height() * 0.70f,
-                    rect.left,
-                    rect.bottom,
+                shader = RadialGradient(
+                    centerX,
+                    centerY,
+                    glowRadius,
                     intArrayOf(
+                        withAlpha(Color.rgb(239, 247, 255), (alpha * 0.32f).toInt().coerceIn(0, 255)),
                         Color.TRANSPARENT,
-                        withAlpha(Color.rgb(234, 243, 255), if (style.isDark) 15 else 10),
-                        withAlpha(Color.rgb(246, 250, 255), if (style.isDark) 31 else 20),
                     ),
-                    floatArrayOf(0f, 0.55f, 1f),
+                    floatArrayOf(0f, 1f),
                     Shader.TileMode.CLAMP,
                 )
             },
         )
 
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = withAlpha(Color.rgb(249, 252, 255), alpha.coerceIn(1, 255))
+            strokeWidth = (radius * 0.18f).coerceIn(0.7f, 2.2f)
+            strokeCap = Paint.Cap.ROUND
+            style = Paint.Style.STROKE
+        }
+        val arm = radius * 1.08f
+        val branchLength = radius * 0.34f
+        val branchOffset = radius * 0.52f
+        repeat(6) { index ->
+            val angle = (PI / 3.0) * index
+            val endX = centerX + (cos(angle) * arm).toFloat()
+            val endY = centerY + (sin(angle) * arm).toFloat()
+            canvas.drawLine(centerX, centerY, endX, endY, paint)
+
+            val baseX = centerX + (cos(angle) * branchOffset).toFloat()
+            val baseY = centerY + (sin(angle) * branchOffset).toFloat()
+            val branchA = angle + (PI / 4.0)
+            val branchB = angle - (PI / 4.0)
+            canvas.drawLine(
+                baseX,
+                baseY,
+                baseX + (cos(branchA) * branchLength).toFloat(),
+                baseY + (sin(branchA) * branchLength).toFloat(),
+                paint,
+            )
+            canvas.drawLine(
+                baseX,
+                baseY,
+                baseX + (cos(branchB) * branchLength).toFloat(),
+                baseY + (sin(branchB) * branchLength).toFloat(),
+                paint,
+            )
+        }
     }
+
 
     private fun drawSnowMotion(canvas: Canvas, rect: RectF, style: GlassExportStyle) {
         val phase = ((style.backgroundPhase % 1f) + 1f) % 1f
-        val random = Random(0x5F21)
-        repeat(70) { index ->
-            val baseX = rect.left + random.nextFloat() * rect.width()
-            val baseY = rect.top + random.nextFloat() * rect.height()
-            val radius = 0.9f + random.nextFloat() * 2.4f
-            val speed = 0.40f + random.nextFloat() * 0.85f
-            val drift = (sin((phase * (PI * 2.0)) + (index * 0.41)) * (2.5 + random.nextFloat() * 4.0)).toFloat()
-            val y = rect.top + (((baseY - rect.top) + (rect.height() * 0.46f * phase * speed)) % (rect.height() + 26f)) - 13f
-            val x = baseX + drift
-            val alpha = (((if (style.isDark) 0.11f else 0.08f) + (radius * 0.018f)) * 255f).toInt().coerceIn(1, 255)
+        val farRandom = Random(0x5F21)
+        val farSpan = rect.height() + 40f
+        repeat(48) { index ->
+            val baseX = rect.left + farRandom.nextFloat() * rect.width()
+            val baseOffset = farRandom.nextFloat() * farSpan
+            val radius = 0.75f + farRandom.nextFloat() * 1.2f
+            val fallCycles = if (index % 6 == 0) 2f else 1f
+            val driftAmplitude = 2.5 + farRandom.nextFloat() * 4.0
+            val driftPhase = farRandom.nextDouble() * PI * 2.0
+            val driftCycles = if (index % 5 == 0) 2.0 else 1.0
+            val y = rect.top + ((baseOffset + phase * farSpan * fallCycles) % farSpan) - 20f
+            val x = baseX + (sin(driftPhase + phase * PI * 2.0 * driftCycles) * driftAmplitude).toFloat()
+            val alpha = (((if (style.isDark) 0.16f else 0.10f) + (radius * 0.030f)) * 255f).toInt().coerceIn(1, 255)
             canvas.drawCircle(x, y, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = withAlpha(Color.rgb(247, 251, 255), alpha)
             })
         }
 
         val nearRandom = Random(0x7319)
-        repeat(18) { index ->
+        val nearSpan = rect.height() + 56f
+        repeat(20) { index ->
             val baseX = rect.left + nearRandom.nextFloat() * rect.width()
-            val baseY = rect.top + nearRandom.nextFloat() * rect.height()
-            val radius = 2.0f + nearRandom.nextFloat() * 3.6f
-            val speed = 0.28f + nearRandom.nextFloat() * 0.42f
-            val sway = (cos((phase * (PI * 2.0)) + (index * 0.53)) * (4.0 + nearRandom.nextFloat() * 6.0)).toFloat()
-            val y = rect.top + (((baseY - rect.top) + (rect.height() * 0.34f * phase * speed)) % (rect.height() + 32f)) - 16f
-            val x = baseX + sway
-            canvas.drawCircle(x, y, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = withAlpha(Color.WHITE, if (style.isDark) 26 else 15)
-            })
+            val baseOffset = nearRandom.nextFloat() * nearSpan
+            val radius = 2.2f + nearRandom.nextFloat() * 2.8f
+            val fallCycles = if (index % 5 == 0) 2f else 1f
+            val swayAmplitude = 4.0 + nearRandom.nextFloat() * 6.0
+            val swayPhase = nearRandom.nextDouble() * PI * 2.0
+            val y = rect.top + ((baseOffset + phase * nearSpan * fallCycles) % nearSpan) - 28f
+            val x = baseX + (cos(swayPhase + phase * PI * 2.0) * swayAmplitude).toFloat()
+            val alpha = (((if (style.isDark) 0.26f else 0.16f) + nearRandom.nextFloat() * 0.16f) * 255f).toInt().coerceIn(1, 255)
+            drawSnowflake(canvas, x, y, radius, alpha)
         }
     }
 
@@ -314,7 +354,7 @@ object GlassExportBackdrop {
         val random = Random(0x5A31)
         repeat(24) {
             val x = rect.left + random.nextFloat() * rect.width()
-            val y = rect.top + random.nextFloat() * rect.height() * 0.84f
+            val y = rect.top + rect.height() * (0.04f + random.nextFloat() * 0.92f)
             val radius = 0.6f + random.nextFloat() * 1.1f
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = textureColor(style, if (style.isDark) 31 else 20)
@@ -381,19 +421,19 @@ object GlassExportBackdrop {
         val points = ArrayList<Pair<Float, Float>>(count)
         val strengths = ArrayList<Float>(count)
         repeat(count) { index ->
-            val yRatio = Math.pow(random.nextDouble(), 0.72).toFloat()
+            val yRatio = random.nextFloat()
             points += Pair(
                 rect.left + random.nextFloat() * rect.width(),
                 rect.top + yRatio * rect.height(),
             )
-            strengths += 0.80f + (index % 5) * 0.05f
+            strengths += 0.84f + (index % 5) * 0.06f
         }
 
         if (constellation) {
             val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.style = Paint.Style.STROKE
                 strokeWidth = 0.55f * (rect.width() / 400f).coerceIn(1f, 2.6f)
-                color = textureColor(style, if (style.isDark) 19 else 13)
+                color = textureColor(style, if (style.isDark) 26 else 18)
             }
             var i = 0
             while (i + 1 < points.size) {
@@ -419,35 +459,64 @@ object GlassExportBackdrop {
 
         val scale = (rect.width() / 400f).coerceIn(1f, 2.6f)
         points.forEachIndexed { index, point ->
-            val strength = strengths[index] * strengths[index]
-            val radius = if (constellation) {
-                if (index % 7 == 0) 1.65f else 0.85f + (index % 3) * 0.18f
+            val emphasis = strengths[index].coerceIn(0.84f, 1.20f)
+            val glowRadius = (if (constellation) {
+                if (index % 7 == 0) 5.6f else 3.1f + (index % 3) * 0.55f
             } else {
-                if (index % 11 == 0) 1.45f else 0.65f + (index % 4) * 0.13f
-            } * scale
-            val baseAlpha = if (style.isDark) 45f else 31f
+                if (index % 11 == 0) 4.6f else 2.2f + (index % 4) * 0.4f
+            }) * scale
+            canvas.drawCircle(
+                point.first,
+                point.second,
+                glowRadius,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = RadialGradient(
+                        point.first,
+                        point.second,
+                        glowRadius,
+                        intArrayOf(
+                            textureColor(style, (((if (style.isDark) 28f else 19f) * emphasis)).toInt().coerceIn(1, 255)),
+                            Color.TRANSPARENT,
+                        ),
+                        floatArrayOf(0f, 1f),
+                        Shader.TileMode.CLAMP,
+                    )
+                },
+            )
+
+            val radius = (if (constellation) {
+                if (index % 7 == 0) 1.95f else 1.05f + (index % 3) * 0.22f
+            } else {
+                if (index % 11 == 0) 1.65f else 0.82f + (index % 4) * 0.15f
+            }) * scale
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = textureColor(style, (baseAlpha * strength).toInt().coerceAtLeast(1))
+                color = textureColor(style, (((if (style.isDark) 84f else 56f) * emphasis)).toInt().coerceAtLeast(1))
             }
             canvas.drawCircle(point.first, point.second, radius, paint)
-            if (constellation && index % 9 == 0) {
+            if (constellation && (index % 4 == 0 || emphasis > 1.04f)) {
                 val cross = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = textureColor(style, ((if (style.isDark) 32f else 22f) * strength).toInt().coerceAtLeast(1))
-                    strokeWidth = 0.55f * scale
+                    color = textureColor(style, (((if (style.isDark) 56f else 38f) * emphasis)).toInt().coerceAtLeast(1))
+                    strokeWidth = 0.65f * scale
+                    strokeCap = Paint.Cap.ROUND
                 }
-                canvas.drawLine(point.first - 3.5f * scale, point.second, point.first + 3.5f * scale, point.second, cross)
-                canvas.drawLine(point.first, point.second - 3.5f * scale, point.first, point.second + 3.5f * scale, cross)
+                val reach = (if (index % 7 == 0) 4.6f else 3.2f) * scale
+                canvas.drawLine(point.first - reach, point.second, point.first + reach, point.second, cross)
+                canvas.drawLine(point.first, point.second - reach, point.first, point.second + reach, cross)
             }
         }
     }
 
 
     private fun drawHearts(canvas: Canvas, rect: RectF, style: GlassExportStyle) {
-        val random = Random(0x7E41)
-        repeat(15) {
-            val centerX = rect.left + rect.width() * (0.08f + random.nextFloat() * 0.84f)
-            val centerY = rect.top + rect.height() * (0.10f + random.nextFloat() * 0.80f)
-            val size = 6f + random.nextFloat() * 7f
+        val phase = ((style.backgroundPhase % 1f) + 1f) % 1f
+        val refreshBucket = (phase * 5f).toInt().coerceIn(0, 4)
+        val random = Random((0x7E41 xor (refreshBucket * 0x45D9F3B)).toLong())
+        val count = 10 + random.nextInt(11)
+        repeat(count) {
+            val centerX = rect.left + rect.width() * (0.05f + random.nextFloat() * 0.90f)
+            val centerY = rect.top + rect.height() * (0.05f + random.nextFloat() * 0.90f)
+            val size = 5.5f + random.nextFloat() * 8f
+            val depth = random.nextFloat()
             val path = Path().apply {
                 moveTo(centerX, centerY + size * 0.34f)
                 cubicTo(
@@ -468,10 +537,15 @@ object GlassExportBackdrop {
                 )
                 close()
             }
+            val minAlpha = if (style.isDark) 14f else 10f
+            val alphaRange = if (style.isDark) 27f else 18f
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.style = Paint.Style.STROKE
-                strokeWidth = 0.9f
-                color = textureColor(style, if (style.isDark) 28 else 18)
+                strokeWidth = 0.72f + depth * 0.42f
+                color = textureColor(
+                    style,
+                    (minAlpha + depth * alphaRange).toInt().coerceIn(1, 255),
+                )
             }
             canvas.drawPath(path, paint)
         }

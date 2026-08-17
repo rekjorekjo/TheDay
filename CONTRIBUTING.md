@@ -6,7 +6,7 @@
 2. 新依赖应说明必要性，并优先使用 Android / Flutter 官方能力或维护状态良好的开源组件。
 3. UI 不复制其他倒数日应用的版式、图标或品牌资产。
 4. 核心日期算法应补充单元测试。
-5. 修改用户可见功能、设置名称或发布行为时，同步检查 `README.md`、`release-notes.md`、应用内更新说明和相关开发文档。
+5. 修改用户可见功能、设置名称或发布行为时，同步检查 `README.md`、`release-notes.md` 和相关开发文档。应用内更新说明由 Gradle 在构建前从根目录 `release-notes.md` 自动生成，不需要单独维护。
 6. 修改 Glass Flutter 代码后至少运行 `flutter analyze`；修改 Android/Kotlin 代码后运行 Gradle 测试与对应 Edition 构建。
 
 首次构建 Glass 前先完成：

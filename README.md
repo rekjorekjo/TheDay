@@ -114,6 +114,8 @@ keyPassword=...
 python scripts/release.py --build --notes release-notes.md
 ```
 
+> `release-notes.md` 是发布说明的唯一人工维护来源。每次 Android 构建前，Gradle 会自动将其转换为纯文本并写入 `app/src/main/res/raw/update_notes.txt`，供 APK 内“更新说明”页面使用。
+
 脚本会先执行：
 
 ```text
@@ -182,3 +184,8 @@ gradlew.bat assembleDebug
 ## 开源协议
 
 Apache License 2.0。
+
+
+### 更新检查与权限
+
+The Day 启动时会在后台检查新版本；发现更新时仅发送系统通知，不会自动下载 APK。用户仍可在“关于”中手动检查并决定是否下载/安装。Android 13 及以上的新安装会请求通知权限；图片选择与保存使用系统接口，不申请广泛存储权限。

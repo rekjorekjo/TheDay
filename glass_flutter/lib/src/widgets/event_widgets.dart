@@ -20,10 +20,12 @@ class EventImage extends StatelessWidget {
     super.key,
     required this.image,
     required this.detail,
+    this.filterQuality = FilterQuality.medium,
   });
 
   final EventImageModel image;
   final bool detail;
+  final FilterQuality filterQuality;
 
   @override
   Widget build(BuildContext context) {
@@ -31,24 +33,83 @@ class EventImage extends StatelessWidget {
     if (path == null || path.isEmpty) return const SizedBox.shrink();
     final file = File(path);
     final transform = detail ? image.detailTransform : image.homeTransform;
-    final alignment = Alignment(
-      (transform.focusX * 2) - 1,
-      (transform.focusY * 2) - 1,
-    );
+    final focusX = transform.focusX.clamp(0.0, 1.0).toDouble();
+    final focusY = transform.focusY.clamp(0.0, 1.0).toDouble();
+    final zoom = transform.zoom.clamp(1.0, 4.0).toDouble();
+    final sourceAspect = image.width > 0 && image.height > 0
+        ? image.width / image.height
+        : 1.0;
 
-    return ClipRect(
-      child: Transform.scale(
-        scale: transform.zoom,
-        child: Image.file(
-          file,
-          fit: BoxFit.cover,
-          alignment: alignment,
-          width: double.infinity,
-          height: double.infinity,
-          filterQuality: FilterQuality.medium,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewportWidth = constraints.maxWidth;
+        final viewportHeight = constraints.maxHeight;
+        if (!viewportWidth.isFinite ||
+            !viewportHeight.isFinite ||
+            viewportWidth <= 0 ||
+            viewportHeight <= 0) {
+          return Image.file(
+            file,
+            fit: BoxFit.cover,
+            filterQuality: filterQuality,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          );
+        }
+
+        final viewportAspect = viewportWidth / viewportHeight;
+        late final double baseWidth;
+        late final double baseHeight;
+        if (sourceAspect > viewportAspect) {
+          baseHeight = viewportHeight;
+          baseWidth = viewportHeight * sourceAspect;
+        } else {
+          baseWidth = viewportWidth;
+          baseHeight = viewportWidth / sourceAspect;
+        }
+
+        final renderedWidth = baseWidth * zoom;
+        final renderedHeight = baseHeight * zoom;
+        final overflowX = (renderedWidth - viewportWidth)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+        final overflowY = (renderedHeight - viewportHeight)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+        final offset = Offset(-overflowX * focusX, -overflowY * focusY);
+
+        return ClipRect(
+          child: Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.hardEdge,
+            children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                width: baseWidth,
+                height: baseHeight,
+                child: Transform.translate(
+                  offset: offset,
+                  child: Transform.scale(
+                    scale: zoom,
+                    alignment: Alignment.topLeft,
+                    filterQuality: filterQuality,
+                    child: RepaintBoundary(
+                      child: Image.file(
+                        file,
+                        fit: BoxFit.fill,
+                        filterQuality: filterQuality,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -213,7 +274,13 @@ class _HeroContent extends StatelessWidget {
             children: [
               Text(
                 event.signedDays.abs().toString(),
-                style: theme.textTheme.displayLarge?.copyWith(color: primary),
+                style: theme.textTheme.displayLarge?.copyWith(
+                  color: primary,
+                  shadows: glassDayCountGlow(
+                    theme.colorScheme.primary,
+                    fontSize: theme.textTheme.displayLarge?.fontSize ?? 58,
+                  ),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.only(left: 7, bottom: 6),

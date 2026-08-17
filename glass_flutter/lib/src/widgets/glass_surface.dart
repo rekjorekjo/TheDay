@@ -350,7 +350,7 @@ class _SnowSceneLayerState extends State<_SnowSceneLayer>
     super.initState();
     _cycle = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 9200),
+      duration: const Duration(milliseconds: 14150),
       value: 0.22,
     );
     _sync();
@@ -404,39 +404,94 @@ class _SnowScenePainter extends CustomPainter {
 
   Color _c(Color color, double opacity) => withOpacitySafe(color, opacity);
 
+  void _drawSnowflake(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double opacity,
+  ) {
+    final glowRadius = radius * 1.9;
+    canvas.drawCircle(
+      center,
+      glowRadius,
+      Paint()
+        ..shader = ui.Gradient.radial(
+          center,
+          glowRadius,
+          <Color>[
+            _c(const Color(0xFFEFF7FF), opacity * 0.32),
+            Colors.transparent,
+          ],
+          const <double>[0.0, 1.0],
+        ),
+    );
+
+    final stroke = radius * 0.18;
+    final arm = radius * 1.08;
+    final branchLength = radius * 0.34;
+    final branchOffset = radius * 0.52;
+    final paint = Paint()
+      ..color = _c(const Color(0xFFF9FCFF), opacity)
+      ..strokeWidth = stroke.clamp(0.7, 2.2)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    for (var i = 0; i < 6; i++) {
+      final angle = (math.pi / 3) * i;
+      final dx = math.cos(angle) * arm;
+      final dy = math.sin(angle) * arm;
+      final end = Offset(center.dx + dx, center.dy + dy);
+      canvas.drawLine(center, end, paint);
+
+      final branchBase = Offset(
+        center.dx + math.cos(angle) * branchOffset,
+        center.dy + math.sin(angle) * branchOffset,
+      );
+      final branchA = angle + math.pi / 4;
+      final branchB = angle - math.pi / 4;
+      canvas.drawLine(
+        branchBase,
+        Offset(
+          branchBase.dx + math.cos(branchA) * branchLength,
+          branchBase.dy + math.sin(branchA) * branchLength,
+        ),
+        paint,
+      );
+      canvas.drawLine(
+        branchBase,
+        Offset(
+          branchBase.dx + math.cos(branchB) * branchLength,
+          branchBase.dy + math.sin(branchB) * branchLength,
+        ),
+        paint,
+      );
+    }
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
     final w = size.width;
     final h = size.height;
 
-    canvas.drawRect(
-      Rect.fromLTWH(0, h * 0.70, w, h * 0.30),
-      Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(0, h * 0.70),
-          Offset(0, h),
-          <Color>[
-            Colors.transparent,
-            _c(const Color(0xFFEAF3FF), isDark ? 0.06 : 0.04),
-            _c(const Color(0xFFF6FAFF), isDark ? 0.12 : 0.08),
-          ],
-          const <double>[0.0, 0.55, 1.0],
-        ),
-    );
-
-    final rng = math.Random(0x5F21);
-    final fall = h * 0.46 * progress;
-    for (var i = 0; i < 70; i++) {
-      final baseX = rng.nextDouble() * w;
-      final baseY = rng.nextDouble() * h;
-      final radius = 0.9 + rng.nextDouble() * 2.4;
-      final speed = 0.40 + rng.nextDouble() * 0.85;
-      final drift = math.sin((progress * math.pi * 2) + (i * 0.41)) *
-          (2.5 + rng.nextDouble() * 4.0);
-      final y = ((baseY + (fall * speed)) % (h + 26)) - 13;
-      final x = baseX + drift;
-      final opacity = (isDark ? 0.11 : 0.08) + (radius * 0.018);
+    // Keep the trajectory mathematically periodic so AnimationController.repeat()
+    // can wrap from 1.0 back to 0.0 without replacing the whole snow field.
+    // Each flake only recycles after it has moved outside the visible viewport.
+    final farRng = math.Random(0x5F21);
+    final farSpan = h + 40.0;
+    for (var i = 0; i < 48; i++) {
+      final baseX = farRng.nextDouble() * w;
+      final baseOffset = farRng.nextDouble() * farSpan;
+      final radius = 0.75 + farRng.nextDouble() * 1.2;
+      final fallCycles = i % 6 == 0 ? 2.0 : 1.0;
+      final driftAmplitude = 2.5 + farRng.nextDouble() * 4.0;
+      final driftPhase = farRng.nextDouble() * math.pi * 2;
+      final driftCycles = i % 5 == 0 ? 2.0 : 1.0;
+      final y = ((baseOffset + (progress * farSpan * fallCycles)) % farSpan) - 20.0;
+      final x = baseX + math.sin(
+        driftPhase + (progress * math.pi * 2 * driftCycles),
+      ) * driftAmplitude;
+      final opacity = (isDark ? 0.16 : 0.10) + (radius * 0.030);
       canvas.drawCircle(
         Offset(x, y),
         radius,
@@ -445,20 +500,20 @@ class _SnowScenePainter extends CustomPainter {
     }
 
     final nearRng = math.Random(0x7319);
-    for (var i = 0; i < 18; i++) {
+    final nearSpan = h + 56.0;
+    for (var i = 0; i < 20; i++) {
       final baseX = nearRng.nextDouble() * w;
-      final baseY = nearRng.nextDouble() * h;
-      final radius = 2.0 + nearRng.nextDouble() * 3.6;
-      final speed = 0.28 + nearRng.nextDouble() * 0.42;
-      final sway = math.cos((progress * math.pi * 2) + (i * 0.53)) *
-          (4.0 + nearRng.nextDouble() * 6.0);
-      final y = ((baseY + (h * 0.34 * progress * speed)) % (h + 32)) - 16;
-      final x = baseX + sway;
-      canvas.drawCircle(
-        Offset(x, y),
-        radius,
-        Paint()..color = _c(const Color(0xFFFFFFFF), isDark ? 0.10 : 0.06),
-      );
+      final baseOffset = nearRng.nextDouble() * nearSpan;
+      final radius = 2.2 + nearRng.nextDouble() * 2.8;
+      final fallCycles = i % 5 == 0 ? 2.0 : 1.0;
+      final swayAmplitude = 4.0 + nearRng.nextDouble() * 6.0;
+      final swayPhase = nearRng.nextDouble() * math.pi * 2;
+      final y = ((baseOffset + (progress * nearSpan * fallCycles)) % nearSpan) - 28.0;
+      final x = baseX + math.cos(
+        swayPhase + (progress * math.pi * 2),
+      ) * swayAmplitude;
+      final opacity = (isDark ? 0.26 : 0.16) + nearRng.nextDouble() * 0.16;
+      _drawSnowflake(canvas, Offset(x, y), radius, opacity);
     }
   }
 
@@ -491,12 +546,13 @@ class _TextureLayerState extends State<_TextureLayer>
       widget.style == 'STARS' || widget.style == 'CONSTELLATION';
 
   bool get _hasAnimatedTexture =>
-      widget.style == 'DIAGONAL' || _isStellar;
+      widget.style == 'DIAGONAL' || widget.style == 'HEART' || _isStellar;
 
-  Duration get _textureDuration =>
-      widget.style == 'DIAGONAL'
-          ? const Duration(milliseconds: 4200)
-          : const Duration(milliseconds: 8200);
+  Duration get _textureDuration {
+    if (widget.style == 'DIAGONAL') return const Duration(milliseconds: 6500);
+    if (widget.style == 'HEART') return const Duration(milliseconds: 6800);
+    return const Duration(milliseconds: 8200);
+  }
 
   @override
   void initState() {
@@ -560,18 +616,54 @@ class _TextureLayerState extends State<_TextureLayer>
     return 0;
   }
 
+  double _heartOpacity(double progress) {
+    if (progress < 0.10) {
+      return Curves.easeOutCubic.transform(progress / 0.10);
+    }
+    if (progress < 0.80) return 1;
+    return 1 - Curves.easeInCubic.transform((progress - 0.80) / 0.20);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.style == 'NONE') return const SizedBox.shrink();
 
-    final baseTexture = RepaintBoundary(
-      child: CustomPaint(
-        painter: _TexturePainter(isDark: widget.isDark, style: widget.style),
-        size: Size.infinite,
-      ),
-    );
+    Widget texture({int? seed, double opacity = 1.0}) => RepaintBoundary(
+          child: CustomPaint(
+            painter: _TexturePainter(
+              isDark: widget.isDark,
+              style: widget.style,
+              seed: seed,
+              opacity: opacity,
+            ),
+            size: Size.infinite,
+          ),
+        );
+
+    final baseTexture = texture(seed: _stellarSeed);
 
     if (!widget.motionEnabled || !_hasAnimatedTexture) return baseTexture;
+
+    if (widget.style == 'HEART') {
+      return RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: _stellarCycle,
+          builder: (context, _) {
+            final opacity = _heartOpacity(_stellarCycle.value);
+            if (opacity <= 0.001) return const SizedBox.shrink();
+            return CustomPaint(
+              painter: _TexturePainter(
+                isDark: widget.isDark,
+                style: widget.style,
+                seed: _stellarSeed,
+                opacity: opacity,
+              ),
+              size: Size.infinite,
+            );
+          },
+        ),
+      );
+    }
 
     return Stack(
       fit: StackFit.expand,
@@ -624,10 +716,17 @@ class _TextureLayerState extends State<_TextureLayer>
 
 
 class _TexturePainter extends CustomPainter {
-  const _TexturePainter({required this.isDark, required this.style});
+  const _TexturePainter({
+    required this.isDark,
+    required this.style,
+    this.seed,
+    this.opacity = 1.0,
+  });
 
   final bool isDark;
   final String style;
+  final int? seed;
+  final double opacity;
 
   Color _tone(double opacity) => withOpacitySafe(
         isDark ? Colors.white : Colors.black,
@@ -657,19 +756,6 @@ class _TexturePainter extends CustomPainter {
         _paintRainBase(canvas, size);
         break;
     }
-  }
-
-  Paint _textureStroke(Size size, double top, double opacity, double width) {
-    return Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = width
-      ..strokeCap = StrokeCap.round
-      ..shader = ui.Gradient.linear(
-        Offset(0, top),
-        Offset(0, size.height),
-        <Color>[_tone(opacity * 0.94), _tone(opacity)],
-        const <double>[0.0, 1.0],
-      );
   }
 
   void _paintRainBase(Canvas canvas, Size size) {
@@ -715,7 +801,7 @@ class _TexturePainter extends CustomPainter {
     final starCount = 24;
     for (var i = 0; i < starCount; i++) {
       final x = rng.nextDouble() * size.width;
-      final y = rng.nextDouble() * size.height * 0.84;
+      final y = size.height * (0.04 + rng.nextDouble() * 0.92);
       final radius = 0.6 + rng.nextDouble() * 1.1;
       canvas.drawCircle(
         Offset(x, y),
@@ -756,20 +842,20 @@ class _TexturePainter extends CustomPainter {
     final span = size.height - fadeTop;
 
     for (var i = 0; i < count; i++) {
-      final yRatio = math.pow(rng.nextDouble(), 0.72).toDouble();
+      final yRatio = rng.nextDouble();
       final point = Offset(
         rng.nextDouble() * size.width,
         fadeTop + (yRatio * span),
       );
       points.add(point);
-      strengths.add(0.80 + ((i % 5) * 0.05));
+      strengths.add(0.84 + ((i % 5) * 0.06));
     }
 
     if (constellation) {
       final linePaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.55
-        ..color = _tone(isDark ? 0.076 : 0.052);
+        ..color = _tone(isDark ? 0.10 : 0.07);
       for (var i = 0; i + 1 < points.length; i += 3) {
         final a = points[i];
         final b = points[i + 1];
@@ -786,25 +872,45 @@ class _TexturePainter extends CustomPainter {
     }
 
     for (var i = 0; i < points.length; i++) {
-      final strength = strengths[i] * strengths[i];
+      final emphasis = strengths[i].clamp(0.84, 1.20);
+      final glowRadius = constellation
+          ? (i % 7 == 0 ? 5.6 : 3.1 + (i % 3) * 0.55)
+          : (i % 11 == 0 ? 4.6 : 2.2 + (i % 4) * 0.4);
+      canvas.drawCircle(
+        points[i],
+        glowRadius,
+        Paint()
+          ..shader = ui.Gradient.radial(
+            points[i],
+            glowRadius,
+            <Color>[
+              _tone((isDark ? 0.11 : 0.075) * emphasis),
+              Colors.transparent,
+            ],
+            const <double>[0.0, 1.0],
+          ),
+      );
+
       final radius = constellation
-          ? (i % 7 == 0 ? 1.65 : 0.85 + (i % 3) * 0.18)
-          : (i % 11 == 0 ? 1.45 : 0.65 + (i % 4) * 0.13);
+          ? (i % 7 == 0 ? 1.95 : 1.05 + (i % 3) * 0.22)
+          : (i % 11 == 0 ? 1.65 : 0.82 + (i % 4) * 0.15);
       final paint = Paint()
-        ..color = _tone((isDark ? 0.175 : 0.120) * strength);
+        ..color = _tone((isDark ? 0.33 : 0.22) * emphasis);
       canvas.drawCircle(points[i], radius, paint);
-      if (constellation && i % 9 == 0) {
+      if (constellation && (i % 4 == 0 || emphasis > 1.04)) {
         final cross = Paint()
-          ..color = _tone((isDark ? 0.125 : 0.085) * strength)
-          ..strokeWidth = 0.55;
+          ..color = _tone((isDark ? 0.22 : 0.15) * emphasis)
+          ..strokeWidth = 0.65
+          ..strokeCap = StrokeCap.round;
+        final reach = (i % 7 == 0 ? 4.6 : 3.2);
         canvas.drawLine(
-          points[i] - const Offset(3.5, 0),
-          points[i] + const Offset(3.5, 0),
+          points[i] - Offset(reach, 0),
+          points[i] + Offset(reach, 0),
           cross,
         );
         canvas.drawLine(
-          points[i] - const Offset(0, 3.5),
-          points[i] + const Offset(0, 3.5),
+          points[i] - Offset(0, reach),
+          points[i] + Offset(0, reach),
           cross,
         );
       }
@@ -812,18 +918,22 @@ class _TexturePainter extends CustomPainter {
   }
 
   void _paintHearts(Canvas canvas, Size size) {
-    final rng = math.Random(0x7E41);
-    for (var i = 0; i < 15; i++) {
+    final rng = math.Random(seed ?? 0x7E41);
+    final count = 10 + rng.nextInt(11);
+    for (var i = 0; i < count; i++) {
       final center = Offset(
-        size.width * (0.08 + rng.nextDouble() * 0.84),
-        size.height * (0.10 + rng.nextDouble() * 0.80),
+        size.width * (0.05 + rng.nextDouble() * 0.90),
+        size.height * (0.05 + rng.nextDouble() * 0.90),
       );
-      final heartSize = 6.0 + rng.nextDouble() * 7.0;
+      final heartSize = 5.5 + rng.nextDouble() * 8.0;
+      final depth = rng.nextDouble();
       final path = _heartPath(center, heartSize);
+      final alpha = (isDark ? 0.055 : 0.040) +
+          (depth * (isDark ? 0.105 : 0.070));
       final paint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.9
-        ..color = _tone(isDark ? 0.11 : 0.07);
+        ..strokeWidth = 0.72 + (depth * 0.42)
+        ..color = _tone(alpha * opacity);
       canvas.drawPath(path, paint);
     }
   }
@@ -840,7 +950,10 @@ class _TexturePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _TexturePainter oldDelegate) =>
-      oldDelegate.isDark != isDark || oldDelegate.style != style;
+      oldDelegate.isDark != isDark ||
+      oldDelegate.style != style ||
+      oldDelegate.seed != seed ||
+      oldDelegate.opacity != opacity;
 }
 
 class _TransientRainPainter extends CustomPainter {
@@ -856,15 +969,17 @@ class _TransientRainPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
     final rng = math.Random(0x6D12);
-    final travel = size.height * progress;
+    final travelSpan = size.height + 64.0;
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     for (var i = 0; i < 28; i++) {
       final baseX = rng.nextDouble() * (size.width + 60) - 30;
-      final baseY = rng.nextDouble() * size.height;
-      final speed = 0.70 + rng.nextDouble() * 0.90;
-      final y = ((baseY + (travel * speed)) % (size.height + 48)) - 24;
+      final baseOffset = rng.nextDouble() * travelSpan;
+      final fallCycles = i % 8 == 0 ? 2.0 : 1.0;
+      final windPhase = rng.nextDouble() * math.pi * 2;
+      final wind = math.sin(windPhase + progress * math.pi * 2) * 1.8;
+      final y = ((baseOffset + (progress * travelSpan * fallCycles)) % travelSpan) - 32.0;
       final length = size.shortestSide * (0.042 + rng.nextDouble() * 0.032);
       final dx = length * (0.16 + rng.nextDouble() * 0.07);
       final dy = length * (0.86 + rng.nextDouble() * 0.08);
@@ -872,8 +987,8 @@ class _TransientRainPainter extends CustomPainter {
         ..strokeWidth = 1.0 + rng.nextDouble() * 0.55
         ..color = _tone(isDark ? 0.16 : 0.10);
       canvas.drawLine(
-        Offset(baseX, y),
-        Offset(baseX - dx, y + dy),
+        Offset(baseX + wind, y),
+        Offset(baseX + wind - dx, y + dy),
         paint,
       );
     }
@@ -976,20 +1091,38 @@ class _TransientStellarPainter extends CustomPainter {
 
     for (var i = 0; i < points.length; i++) {
       final emphasis = rng.nextDouble();
+      final glowRadius = constellation
+          ? (3.0 + emphasis * 2.6)
+          : (2.4 + emphasis * 2.1);
+      canvas.drawCircle(
+        points[i],
+        glowRadius,
+        Paint()
+          ..shader = ui.Gradient.radial(
+            points[i],
+            glowRadius,
+            <Color>[
+              _tone(isDark ? 0.14 : 0.10),
+              Colors.transparent,
+            ],
+            const <double>[0.0, 1.0],
+          ),
+      );
+
       final radius = constellation
-          ? (0.95 + emphasis * 1.15)
-          : (0.80 + emphasis * 1.25);
+          ? (1.10 + emphasis * 1.20)
+          : (0.95 + emphasis * 1.05);
       canvas.drawCircle(
         points[i],
         radius,
-        Paint()..color = _tone(isDark ? 0.30 : 0.20),
+        Paint()..color = _tone(isDark ? 0.34 : 0.24),
       );
-      if (emphasis > 0.78) {
+      if (emphasis > 0.60) {
         final flare = Paint()
-          ..color = _tone(isDark ? 0.22 : 0.15)
-          ..strokeWidth = 0.62
+          ..color = _tone(isDark ? 0.24 : 0.17)
+          ..strokeWidth = 0.68
           ..strokeCap = StrokeCap.round;
-        final reach = 2.8 + (emphasis * 1.8);
+        final reach = 3.2 + (emphasis * 2.2);
         canvas.drawLine(
           points[i] - Offset(reach, 0),
           points[i] + Offset(reach, 0),

@@ -42,6 +42,73 @@ val appVersionName =
                 "versionName must use X.Y.Z",
         )
 
+val releaseNotesFile = rootProject.file("release-notes.md")
+val updateNotesFile = project.file("src/main/res/raw/update_notes.txt")
+
+fun markdownReleaseNotesToPlainText(markdown: String): String {
+    val output = mutableListOf<String>()
+    var previousWasBlank = false
+
+    markdown
+        .replace("\r\n", "\n")
+        .replace('\r', '\n')
+        .lineSequence()
+        .forEach { rawLine ->
+            var line = rawLine.trimEnd()
+
+            line = line.replace(Regex("""^\s{0,3}#{1,6}\s+"""), "")
+            line = line.replace(Regex("""^\s*[-*+]\s+"""), "• ")
+            line = line.replace(Regex("""^\s*\d+[.)]\s+"""), "• ")
+            line = line.replace(Regex("""^\s*>\s?"""), "")
+            line = line.replace(Regex("""!\[([^\]]*)]\([^)]+\)""")) { match ->
+                match.groupValues[1]
+            }
+            line = line.replace(Regex("""\[([^\]]+)]\([^)]+\)""")) { match ->
+                match.groupValues[1]
+            }
+            line = line
+                .replace("**", "")
+                .replace("__", "")
+                .replace("~~", "")
+                .replace("`", "")
+            line = line.replace(Regex("""\*([^*]+)\*""")) { match -> match.groupValues[1] }
+            line = line.replace(Regex("""_([^_]+)_""")) { match -> match.groupValues[1] }
+
+            val isBlank = line.isBlank()
+            if (!isBlank || !previousWasBlank) {
+                output += if (isBlank) "" else line.trimStart()
+            }
+            previousWasBlank = isBlank
+        }
+
+    while (output.isNotEmpty() && output.last().isBlank()) {
+        output.removeAt(output.lastIndex)
+    }
+    return output.joinToString("\n") + "\n"
+}
+
+val generateUpdateNotes by tasks.registering {
+    group = "build setup"
+    description = "Generate APK update_notes.txt from root release-notes.md"
+    inputs.file(releaseNotesFile)
+    outputs.file(updateNotesFile)
+
+    doLast {
+        require(releaseNotesFile.isFile) {
+            "release-notes.md not found: ${releaseNotesFile.absolutePath}"
+        }
+        updateNotesFile.parentFile.mkdirs()
+        updateNotesFile.writeText(
+            markdownReleaseNotesToPlainText(releaseNotesFile.readText(Charsets.UTF_8)),
+            Charsets.UTF_8,
+        )
+    }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(generateUpdateNotes)
+}
+
 val signingPropertiesFile = rootProject.file("keystore.properties")
 val signingProperties = Properties()
 val hasReleaseSigning = signingPropertiesFile.isFile
