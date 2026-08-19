@@ -104,8 +104,8 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
                           date: offsetStart,
                           suffix: '开始',
                           onTap: () async {
-                            final value = await _pick(offsetStart);
-                            if (value != null && mounted) setState(() => offsetStart = value);
+                            final selectedDate = await _pick(offsetStart);
+                            if (selectedDate != null && mounted) setState(() => offsetStart = selectedDate);
                           },
                         ),
                         const SizedBox(height: 12),
@@ -170,8 +170,8 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
                           date: intervalStart,
                           suffix: '开始，',
                           onTap: () async {
-                            final value = await _pick(intervalStart);
-                            if (value != null && mounted) setState(() => intervalStart = value);
+                            final selectedDate = await _pick(intervalStart);
+                            if (selectedDate != null && mounted) setState(() => intervalStart = selectedDate);
                           },
                         ),
                         const SizedBox(height: 10),
@@ -180,8 +180,8 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
                           date: intervalEnd,
                           suffix: '结束',
                           onTap: () async {
-                            final value = await _pick(intervalEnd);
-                            if (value != null && mounted) setState(() => intervalEnd = value);
+                            final selectedDate = await _pick(intervalEnd);
+                            if (selectedDate != null && mounted) setState(() => intervalEnd = selectedDate);
                           },
                         ),
                         const SizedBox(height: 18),

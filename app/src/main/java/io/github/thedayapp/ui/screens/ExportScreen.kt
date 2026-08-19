@@ -130,15 +130,7 @@ fun ExportScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val locale = currentJavaLocale()
 
-    val visibleEvents = remember(
-        state.events,
-        state.settings.showPastEvents,
-        state.today,
-    ) {
-        state.events.filter { event ->
-            state.settings.showPastEvents || !DayMath.isPast(event, state.today)
-        }
-    }
+    val visibleEvents = state.events
     val sortedEvents = remember(
         visibleEvents,
         state.settings.sortMode,
@@ -158,7 +150,7 @@ fun ExportScreen(
     var step by rememberSaveable { mutableStateOf(ExportStep.SELECT) }
     var selectionMode by rememberSaveable { mutableStateOf(false) }
     var mode by rememberSaveable { mutableStateOf(ExportMode.LONG_IMAGE) }
-    var exportTitle by rememberSaveable { mutableStateOf("The Day") }
+    var exportTitle by rememberSaveable { mutableStateOf("此日") }
     var selectedTemplate by rememberSaveable {
         mutableStateOf(MemoryImageTemplate.CIRCLES)
     }

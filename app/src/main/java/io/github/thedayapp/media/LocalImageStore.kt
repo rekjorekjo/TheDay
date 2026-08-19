@@ -86,6 +86,8 @@ class LocalImageStore(context: Context) {
                 ) {
                     runCatching {
                         deleteImage(fileName)
+                    }.onFailure { cleanupError ->
+                        Log.w(TAG, "Failed to clean up cancelled image import", cleanupError)
                     }
                 }
             }
@@ -110,7 +112,7 @@ class LocalImageStore(context: Context) {
             )
         }
 
-        // Create temporary source file
+        // 先复制到应用私有临时文件，后续尺寸读取、EXIF 和解码都基于同一稳定来源。
         sourceTempFile = File(
             imageDirectory,
             ".source-${UUID.randomUUID()}.tmp",
@@ -122,40 +124,34 @@ class LocalImageStore(context: Context) {
         var importCompleted = false
 
         try {
-            // Copy URI content to temporary source file
             copyUriToSourceFile(
                 uri = uri,
                 destination = sourceTempFile,
             )
 
-            // Read bounds from temporary source file
             val (originalWidth, originalHeight) = readImageBounds(sourceTempFile)
             if (originalWidth <= 0 || originalHeight <= 0) {
                 throw IOException("Invalid image dimensions")
             }
 
-            // Calculate sample size
+            // 先按尺寸采样，再应用 EXIF 方向并限制最长边，降低大图导入时的峰值内存。
             val inSampleSize = calculateInSampleSize(
                 width = originalWidth,
                 height = originalHeight,
                 maxLongEdge = maxLongEdge,
             )
 
-            // Decode bitmap from temporary source file
             bitmap = decodeBitmap(sourceTempFile, inSampleSize)
                 ?: throw IOException("Failed to decode bitmap")
 
-            // Read EXIF orientation from temporary source file
             val exifOrientation = readExifOrientation(sourceTempFile)
 
-            // Apply EXIF orientation (may return same or new bitmap)
             val orientedBitmap = applyExifOrientation(bitmap, exifOrientation)
             if (orientedBitmap !== bitmap) {
                 bitmap.recycle()
                 bitmap = orientedBitmap
             }
 
-            // Scale if needed (may return same or new bitmap)
             val scaledBitmap = scaleIfNeeded(
                 bitmap = bitmap,
                 maxLongEdge = maxLongEdge,
@@ -165,48 +161,42 @@ class LocalImageStore(context: Context) {
                 bitmap = scaledBitmap
             }
 
-            // Generate file name
+            // 先写临时 WebP，确认文件有效后再移动到最终文件名，失败时统一清理中间产物。
             val fileName = "${UUID.randomUUID()}.webp"
             val outputFile = File(imageDirectory, fileName)
             val temporaryOutputFile = File(imageDirectory, ".$fileName.tmp")
             finalFile = outputFile
             tempFile = temporaryOutputFile
 
-            // Write to temp file
             writeWebP(bitmap, temporaryOutputFile)
 
-            // Move to final location
             if (!temporaryOutputFile.renameTo(outputFile)) {
                 temporaryOutputFile.copyTo(outputFile, overwrite = true)
                 temporaryOutputFile.delete()
             }
 
-            // Verify
             if (!outputFile.exists() || outputFile.length() == 0L) {
                 throw IOException("Failed to write final file")
             }
 
-            val result = StoredImageFile(
+            val storedImage = StoredImageFile(
                 fileName = outputFile.name,
                 width = bitmap.width,
                 height = bitmap.height,
             )
 
             importCompleted = true
-            return result
+            return storedImage
         } finally {
-            // Clean up temporary source file
+            // 无论成功与否都清理临时文件并回收 Bitmap；失败时同时删除未完成的目标文件。
             sourceTempFile?.delete()
 
-            // Clean up temp file
             tempFile?.delete()
 
-            // Clean up final file on failure
             if (!importCompleted) {
                 finalFile?.delete()
             }
 
-            // Recycle bitmap
             bitmap?.let {
                 if (!it.isRecycled) {
                     it.recycle()
@@ -301,7 +291,8 @@ class LocalImageStore(context: Context) {
                 ExifInterface.TAG_ORIENTATION,
                 ExifInterface.ORIENTATION_NORMAL,
             )
-        } catch (_: Exception) {
+        } catch (exception: IOException) {
+            Log.w(TAG, "Failed to read EXIF orientation; using default", exception)
             ExifInterface.ORIENTATION_NORMAL
         }
     }

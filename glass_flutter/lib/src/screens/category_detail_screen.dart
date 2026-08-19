@@ -42,7 +42,8 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
           await widget.controller.updateCategoryCover(widget.category, image);
         }
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('分类封面处理失败: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('封面处理失败')),
@@ -78,7 +79,8 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     try {
       await widget.controller.deleteCategory(widget.category);
       if (mounted) Navigator.of(context).pop();
-    } catch (_) {
+    } catch (error) {
+      debugPrint('删除分类失败: $error');
       if (mounted) {
         setState(() => deleteBusy = false);
         ScaffoldMessenger.of(context).showSnackBar(

@@ -77,7 +77,7 @@ fun ToolsScreen(
             }
             item {
                 ToolCard(
-                    title = "里程碑",
+                    title = "纪念碑",
                     icon = Icons.Rounded.Flag,
                     onClick = onOpenMilestones,
                 )

@@ -103,10 +103,7 @@ fun SettingsScreen(
             TopAppBar(
                 modifier = Modifier.background(topBarBackground),
                 colors = TopAppBarDefaults.topAppBarColors(
-                    // Material 3 animates the app-bar container color. When
-                    // switching light/dark mode that left the old color on
-                    // screen for several frames. Draw the background directly
-                    // on the modifier and keep the internal container clear.
+                    // Material 3 会动画过渡顶部栏容器色；主题切换时直接在 Modifier 绘制背景，避免残留旧配色。
                     containerColor = Color.Transparent,
                     scrolledContainerColor = Color.Transparent,
                     titleContentColor = topBarContent,
@@ -257,15 +254,6 @@ fun SettingsScreen(
                         Text(if (state.settings.sortDirection == SortDirection.ASCENDING) "升序" else "降序")
                     }
                 }
-                HorizontalDivider()
-                SwitchRow(
-                    title = "显示正数日",
-                    description = "关闭后，首页和小组件只显示倒数日和今天",
-                    checked = state.settings.showPastEvents,
-                    onCheckedChange = {
-                        state.updateSettings(state.settings.copy(showPastEvents = it))
-                    },
-                )
             }
 
             SettingsCard(

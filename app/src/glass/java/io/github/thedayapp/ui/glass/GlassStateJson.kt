@@ -35,9 +35,7 @@ internal object GlassStateJson {
             direction = state.settings.sortDirection,
             today = state.today,
         )
-        val visibleEvents = orderedEvents.filter { event ->
-            state.settings.showPastEvents || !DayMath.isPast(event, state.today)
-        }
+        val visibleEvents = orderedEvents
         val heroEvent = EventOrdering.heroEvent(visibleEvents, state.today)
 
         return JSONObject()
@@ -233,7 +231,6 @@ internal object GlassStateJson {
                 json.optString("sortDirection"),
                 current.sortDirection,
             ),
-            showPastEvents = json.optBoolean("showPastEvents", current.showPastEvents),
             reminderHour = json.optInt("reminderHour", current.reminderHour).coerceIn(0, 23),
             reminderMinute = json.optInt("reminderMinute", current.reminderMinute).coerceIn(0, 59),
         )
@@ -312,7 +309,6 @@ internal object GlassStateJson {
         .put("dynamicEdgeReflection", settings.dynamicEdgeReflection)
         .put("sortMode", settings.sortMode.name)
         .put("sortDirection", settings.sortDirection.name)
-        .put("showPastEvents", settings.showPastEvents)
         .put("reminderHour", settings.reminderHour)
         .put("reminderMinute", settings.reminderMinute)
 

@@ -11,8 +11,7 @@ import kotlin.math.max
 
 object DayMath {
     /**
-     * Returns the date represented by an annual event in [year].
-     * February 29 falls back to February 28 in non-leap years.
+     * 计算每年重复事件在 [year] 中对应的日期；非闰年遇到 2 月 29 日时回退到 2 月 28 日。
      */
     fun annualDate(original: LocalDate, year: Int): LocalDate = try {
         LocalDate.of(year, original.month, original.dayOfMonth)
@@ -21,8 +20,7 @@ object DayMath {
     }
 
     /**
-     * For one-off events this is the original date. For annual events this is
-     * the first occurrence on or after [today], never earlier than the original year.
+     * 一次性事件直接返回原日期；每年重复事件返回不早于 [today] 且不早于原始年份的下一次日期。
      */
     fun effectiveDate(event: DayEvent, today: LocalDate): LocalDate {
         if (event.repeatMode == RepeatMode.NONE) return event.date
@@ -36,9 +34,7 @@ object DayMath {
         return candidate
     }
 
-    /**
-     * Positive: days remaining. Zero: today. Negative: days elapsed.
-     */
+    /** 正数表示剩余天数，0 表示今天，负数表示已经过去的天数。 */
     fun signedDays(event: DayEvent, today: LocalDate): Long =
         ChronoUnit.DAYS.between(today, effectiveDate(event, today))
 
@@ -47,8 +43,8 @@ object DayMath {
     fun isUpcoming(event: DayEvent, today: LocalDate): Boolean = signedDays(event, today) >= 0
 
     /**
-     * Computes the next local alarm time. Annual events roll forward until the
-     * reminder is strictly after [now]. One-off reminders in the past return null.
+     * 计算下一次本地提醒时间。每年重复事件向后寻找下一次有效提醒；
+     * 一次性事件的提醒时刻已经过去时返回 null。
      */
     fun nextReminderDateTime(
         event: DayEvent,

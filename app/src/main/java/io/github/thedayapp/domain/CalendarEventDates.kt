@@ -10,11 +10,12 @@ object CalendarEventDates {
         events: List<DayEvent>,
         month: YearMonth,
     ): Set<LocalDate> {
-        val result = mutableSetOf<LocalDate>()
+        val dates = mutableSetOf<LocalDate>()
 
         for (event in events) {
             val date = when (event.repeatMode) {
                 io.github.thedayapp.data.RepeatMode.YEARLY -> {
+                    // 每年重复事件从原始年份起生效；闰日由 DayMath 统一回退到当年有效日期。
                     if (month.year < event.date.year) {
                         continue
                     }
@@ -36,9 +37,9 @@ object CalendarEventDates {
                 }
             }
 
-            result.add(date)
+            dates.add(date)
         }
 
-        return result
+        return dates
     }
 }

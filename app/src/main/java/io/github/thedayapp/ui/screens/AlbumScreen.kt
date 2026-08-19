@@ -602,6 +602,7 @@ private fun AlbumCardDeck(
             )
         }
 
+        // 手势层只负责切换当前卡片和长按操作，不改变底层纪念册事件顺序。
         Box(
             modifier = Modifier
                 .matchParentSize()

@@ -134,7 +134,7 @@ fun MilestoneScreen(
     var showEditor by remember { mutableStateOf(false) }
     var step by remember { mutableStateOf(MilestoneStep.LIST) }
     var selectedTemplate by remember { mutableStateOf(MemoryImageTemplate.MINIMAL) }
-    var exportTitle by remember { mutableStateOf("里程碑") }
+    var exportTitle by remember { mutableStateOf("纪念碑") }
     var workingAction by remember { mutableStateOf<MilestoneExportAction?>(null) }
     var exportProgress by remember { mutableFloatStateOf(0f) }
     val selectedIds = remember { mutableStateListOf<String>() }
@@ -206,7 +206,7 @@ fun MilestoneScreen(
             id = milestone.id,
             title = milestone.title,
             date = milestone.date,
-            category = "里程碑",
+            category = "纪念碑",
             note = milestone.note,
             createdAtEpochMillis = milestone.createdAtEpochMillis,
         )
@@ -220,7 +220,7 @@ fun MilestoneScreen(
             locale = locale,
             palette = memoryPalette,
             template = selectedTemplate,
-            title = exportTitle.trim().takeIf { it.isNotEmpty() } ?: "里程碑",
+            title = exportTitle.trim().takeIf { it.isNotEmpty() } ?: "纪念碑",
             onProgress = { fraction ->
                 withContext(Dispatchers.Main.immediate) {
                     exportProgress = 0.06f + fraction * 0.78f
@@ -244,7 +244,7 @@ fun MilestoneScreen(
             if (bitmaps == null) {
                 workingAction = null
                 exportProgress = 0f
-                snackbarHostState.showSnackbar("里程碑列表生成失败")
+                snackbarHostState.showSnackbar("纪念碑列表生成失败")
                 return@launch
             }
             val result = if (action == MilestoneExportAction.SHARE) {
@@ -302,7 +302,7 @@ fun MilestoneScreen(
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background,
                         ),
-                        title = { Text(if (selectionMode && selectedIds.isNotEmpty()) "已选 ${selectedIds.size}" else if (selectionMode) "选择里程碑" else "里程碑") },
+                        title = { Text(if (selectionMode && selectedIds.isNotEmpty()) "已选 ${selectedIds.size}" else if (selectionMode) "选择纪念碑" else "纪念碑") },
                         navigationIcon = {
                             IconButton(
                                 onClick = {
@@ -315,7 +315,7 @@ fun MilestoneScreen(
                         actions = {
                             if (!selectionMode) {
                                 IconButton(onClick = { showEditor = true }) {
-                                    Icon(Icons.Rounded.Add, contentDescription = "新增里程碑")
+                                    Icon(Icons.Rounded.Add, contentDescription = "新增纪念碑")
                                 }
                             }
                         },
@@ -346,7 +346,7 @@ fun MilestoneScreen(
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background,
                         ),
-                        title = { Text("导出里程碑") },
+                        title = { Text("导出纪念碑") },
                         navigationIcon = {
                             IconButton(onClick = { step = MilestoneStep.SORT }) {
                                 Icon(Icons.Rounded.ArrowBack, contentDescription = "返回")
@@ -481,7 +481,7 @@ private fun MilestoneListPage(
             if (milestones.isEmpty()) {
                 item {
                     Text(
-                        text = "还没有里程碑",
+                        text = "还没有纪念碑",
                         modifier = Modifier.padding(vertical = 22.dp),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1059,7 +1059,7 @@ private fun MilestoneExportSettingsPage(
         }
         item {
             Text(
-                text = "已选择 $selectedCount 个里程碑",
+                text = "已选择 $selectedCount 个纪念碑",
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.titleSmall,
@@ -1151,7 +1151,7 @@ private fun MilestoneEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("新增里程碑") },
+        title = { Text("新增纪念碑") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(

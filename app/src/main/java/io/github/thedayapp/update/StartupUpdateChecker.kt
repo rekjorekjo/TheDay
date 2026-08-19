@@ -9,9 +9,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Runs one lightweight update check when a launcher activity starts.
- * It never starts an APK download; it only posts a system notification when
- * a newer release exists.
+ * 启动入口 Activity 时执行一次轻量更新检查；这里只负责发现新版本并发系统通知，不自动下载 APK。
  */
 object StartupUpdateChecker {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

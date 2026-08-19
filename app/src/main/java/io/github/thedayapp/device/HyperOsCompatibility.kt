@@ -2,6 +2,7 @@ package io.github.thedayapp.device
 
 import android.content.Context
 import android.os.Build
+import java.io.IOException
 
 object HyperOsCompatibility {
     private const val PREFERENCES_NAME = "device_compatibility"
@@ -9,9 +10,8 @@ object HyperOsCompatibility {
     private const val KEY_CHECKED_BUILD_FINGERPRINT = "checked_build_fingerprint"
 
     /**
-     * Performs the device check only when needed. A positive HyperOS result is
-     * sticky so the quick-add entry never reappears after it has been hidden.
-     * A negative result is checked again only after a system build change.
+     * 仅在需要时检测设备。检测为 HyperOS 后永久隐藏快速添加入口；
+     * 检测为非 HyperOS 时，仅在系统构建指纹变化后重新检查。
      */
     fun initialize(context: Context) {
         val preferences = preferences(context)
@@ -80,16 +80,20 @@ object HyperOsCompatibility {
     }
 
     private fun readSystemProperty(name: String): String? {
-        return runCatching {
+        // 厂商系统属性并非所有设备都允许读取，失败时按“未检测到”处理即可。
+        val propertyValue = try {
             ProcessBuilder("/system/bin/getprop", name)
                 .redirectErrorStream(true)
                 .start()
                 .inputStream
                 .bufferedReader()
-                .use { reader ->
-                    reader.readLine()?.trim()
-                }
-        }.getOrNull()?.takeIf(String::isNotBlank)
+                .use { reader -> reader.readLine()?.trim() }
+        } catch (_: IOException) {
+            null
+        } catch (_: SecurityException) {
+            null
+        }
+        return propertyValue?.takeIf(String::isNotBlank)
     }
 
     private fun preferences(context: Context) =

@@ -301,7 +301,7 @@ private fun DayWidgetConfigureContent(
                 color = if (glass) glassSpec?.foreground ?: Color.White else Color.Unspecified,
             )
             Text(
-                text = "请先打开 The Day 创建一个日子，再从桌面添加小组件。",
+                text = "请先打开此日创建一个日子，再从桌面添加小组件。",
                 modifier = Modifier.padding(top = 8.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (glass) glassSpec?.secondary ?: Color.White.copy(alpha = 0.70f)

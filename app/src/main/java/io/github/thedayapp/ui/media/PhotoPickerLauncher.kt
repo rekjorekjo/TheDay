@@ -5,6 +5,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,9 +45,8 @@ data class CroppedImageSelection(
 )
 
 /**
- * Opens the system photo picker, retains a cached source, and immediately
- * launches uCrop. Leaving the default full-image crop unchanged keeps the
- * complete composition while still producing the display copy used by the UI.
+ * 打开系统图片选择器后保留一份应用内原图，并立即进入 uCrop。用户不改变默认全图范围时，
+ * 仍会保留完整构图，同时生成界面实际使用的显示副本。
  */
 @Composable
 fun rememberSingleImagePickerLauncher(
@@ -204,10 +204,7 @@ fun rememberSingleImagePickerLauncher(
     }
 }
 
-/**
- * Reopens uCrop from the persisted uncropped source. Pressing uCrop's check
- * button without changing the full-image crop keeps the complete source.
- */
+/** 从持久化的未裁切原图重新进入 uCrop；保持全图范围确认时不会丢失原始构图。 */
 @Composable
 fun rememberImageRecropLauncher(
     image: LocalImageReference?,
@@ -404,7 +401,9 @@ private fun createTemporarySourceUri(
 
         return Uri.fromFile(sourceFile)
     } catch (exception: Exception) {
-        sourceFile.delete()
+        if (sourceFile.exists() && !sourceFile.delete()) {
+            Log.w("TheDayPhotoPicker", "Failed to remove incomplete source image")
+        }
         throw exception
     }
 }
@@ -435,7 +434,7 @@ private fun ensureCropCacheDirectory(directory: File) {
 private fun deleteStalePickerImages(directory: File) {
     val staleBefore = System.currentTimeMillis() - STALE_CROP_FILE_AGE_MILLIS
 
-    runCatching {
+    try {
         directory.listFiles()
             ?.asSequence()
             ?.filter { file ->
@@ -444,8 +443,12 @@ private fun deleteStalePickerImages(directory: File) {
                     file.lastModified() < staleBefore
             }
             ?.forEach { file ->
-                runCatching { file.delete() }
+                if (!file.delete()) {
+                    Log.d("TheDayPhotoPicker", "Stale crop file could not be deleted: ${file.name}")
+                }
             }
+    } catch (exception: SecurityException) {
+        Log.w("TheDayPhotoPicker", "Failed to scan stale crop files", exception)
     }
 }
 
@@ -458,7 +461,7 @@ private fun isTemporaryPickerFile(file: File): Boolean {
         file.name.startsWith(SOURCE_FILE_PREFIX)
 }
 
-/** Deletes only files created in this app's cache/ucrop directory. */
+/** 仅删除本应用 cache/ucrop 目录中由裁剪流程创建的文件。 */
 internal fun deleteTemporaryPickerImage(
     context: Context,
     uri: Uri,
@@ -469,15 +472,20 @@ internal fun deleteTemporaryPickerImage(
 
     val path = uri.path ?: return
 
-    runCatching {
+    try {
         val cropDirectory = cropCacheDirectory(context).canonicalFile
         val file = File(path).canonicalFile
 
         if (
             file.parentFile == cropDirectory &&
-            isTemporaryPickerFile(file)
+            isTemporaryPickerFile(file) &&
+            !file.delete()
         ) {
-            file.delete()
+            Log.d("TheDayPhotoPicker", "Temporary crop file could not be deleted: ${file.name}")
         }
+    } catch (exception: IOException) {
+        Log.w("TheDayPhotoPicker", "Failed to resolve temporary crop path", exception)
+    } catch (exception: SecurityException) {
+        Log.w("TheDayPhotoPicker", "Failed to delete temporary crop file", exception)
     }
 }

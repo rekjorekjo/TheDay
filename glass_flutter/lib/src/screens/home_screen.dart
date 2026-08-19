@@ -34,9 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final snapshot = widget.controller.snapshot!;
-    final visibleEvents = snapshot.events.where((event) {
-      return snapshot.settings.showPastEvents || event.signedDays >= 0;
-    }).toList(growable: false);
+    final visibleEvents = snapshot.events;
     final categories = visibleEvents
         .map((event) => event.category.trim())
         .where((value) => value.isNotEmpty)
@@ -44,10 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     selectedCategories.removeWhere((value) => !categories.contains(value));
-    if (!snapshot.settings.showPastEvents && timeFilter == 'PAST') {
-      timeFilter = 'ALL';
-    }
-
     final filtered = visibleEvents.where((event) {
       final timeMatches = switch (timeFilter) {
         'UPCOMING' => event.signedDays >= 0,
@@ -249,7 +243,7 @@ class _HomeHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'THE DAY',
+                  '此日',
                   style: theme.textTheme.titleMedium?.copyWith(
                     letterSpacing: 2.2,
                     fontWeight: FontWeight.w700,
@@ -554,13 +548,12 @@ class _HomeFilterForm extends StatelessWidget {
                       onSelected: (_) => onTimeFilterChanged('UPCOMING'),
                       label: Text('倒数 $upcomingCount'),
                     ),
-                    if (snapshot.settings.showPastEvents)
-                      FilterChip(
-                        selected: timeFilter == 'PAST',
-                        showCheckmark: false,
-                        onSelected: (_) => onTimeFilterChanged('PAST'),
-                        label: Text('正数 $pastCount'),
-                      ),
+                    FilterChip(
+                      selected: timeFilter == 'PAST',
+                      showCheckmark: false,
+                      onSelected: (_) => onTimeFilterChanged('PAST'),
+                      label: Text('正数 $pastCount'),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -628,28 +621,27 @@ class _EventCalendarSheetState extends State<_EventCalendarSheet> {
   }
 
   void _shift(int delta) {
-    final value = DateTime(year, month + delta, 1);
+    final targetMonth = DateTime(year, month + delta, 1);
     setState(() {
-      year = value.year;
-      month = value.month;
+      year = targetMonth.year;
+      month = targetMonth.month;
     });
   }
 
   Set<int> get eventDays {
-    final result = <int>{};
+    final daysWithEvents = <int>{};
     for (final event in widget.snapshot.events) {
       if (event.repeatMode == 'YEARLY') {
-        // Match Classic/DayMath: yearly events do not exist before their
-        // original year, and Feb 29 falls back to Feb 28 in non-leap years.
+        // 与 Classic/DayMath 保持一致：每年重复事件不早于原始年份，非闰年的 2 月 29 日回退到 2 月 28 日。
         if (year < event.date.year || event.date.month != month) continue;
         final maxDay = DateTime(year, event.date.month + 1, 0).day;
         final annualDay = event.date.day > maxDay ? maxDay : event.date.day;
-        result.add(annualDay);
+        daysWithEvents.add(annualDay);
       } else if (event.date.year == year && event.date.month == month) {
-        result.add(event.date.day);
+        daysWithEvents.add(event.date.day);
       }
     }
-    return result;
+    return daysWithEvents;
   }
 
   @override

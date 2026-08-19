@@ -13,10 +13,8 @@ import kotlin.math.ceil
 import kotlin.math.max
 
 /**
- * Produces a small static glossy count bitmap for RemoteViews. Android home
- * screen widgets cannot run a reliable continuous Compose-style animation, so
- * the widget uses a static metallic-gold highlight and glow while the in-app
- * hero card uses an animated sweep.
+ * 为 RemoteViews 生成静态金属高光计数位图。桌面小组件不运行持续的 Compose 动画，
+ * 因此使用固定高光和光晕；应用内主卡片仍保留动态扫光。
  */
 internal object WidgetCountImageRenderer {
     fun render(

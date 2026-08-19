@@ -101,9 +101,7 @@ fun HomeScreen(
 
     val monthProgressPercent = (monthProgress * 100f).roundToInt()
 
-    val settingsVisible = state.events.filter {
-        state.settings.showPastEvents || !DayMath.isPast(it, state.today)
-    }
+    val settingsVisible = state.events
     val categories = settingsVisible
         .map { it.category }
         .filter { it.isNotBlank() }
@@ -115,11 +113,6 @@ fun HomeScreen(
         val retainedCategories = selectedCategories.filter { it in availableCategories }.toSet()
         if (retainedCategories != selectedCategories) {
             selectedCategories = retainedCategories
-        }
-    }
-    LaunchedEffect(state.settings.showPastEvents, filter) {
-        if (!state.settings.showPastEvents && filter == HomeFilter.PAST) {
-            filter = HomeFilter.ALL
         }
     }
 
@@ -167,7 +160,7 @@ fun HomeScreen(
                         )
                         Column {
                             Text(
-                                text = "THE DAY",
+                                text = "此日",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 2.sp,
@@ -282,7 +275,7 @@ fun HomeScreen(
                                     totalCount = settingsVisible.size,
                                     upcomingCount = upcomingCount,
                                     pastCount = pastCount,
-                                    showPastFilter = state.settings.showPastEvents,
+                                    showPastFilter = true,
                                     onFilterChange = { filter = it },
                                     onCategoryToggle = { category ->
                                         selectedCategories = if (category in selectedCategories) {

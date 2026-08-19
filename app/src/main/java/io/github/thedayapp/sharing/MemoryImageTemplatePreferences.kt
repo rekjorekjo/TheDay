@@ -12,9 +12,12 @@ object MemoryImageTemplatePreferences {
             .getString(KEY_LAST_TEMPLATE, null)
 
         return storedName?.let { name ->
-            runCatching {
+            try {
                 MemoryImageTemplate.valueOf(name)
-            }.getOrNull()
+            } catch (_: IllegalArgumentException) {
+                // 旧版本保存的模板名已不存在时回到默认模板。
+                null
+            }
         } ?: MemoryImageTemplate.CIRCLES
     }
 

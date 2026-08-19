@@ -14,14 +14,8 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * Adds four edge drag zones to uCrop's freestyle crop frame.
- *
- * Upstream uCrop already keeps the opposite two sides fixed while a corner is
- * dragged. It does not provide dedicated edge handles, so touching an edge can
- * otherwise be interpreted as moving the whole crop rectangle. This activity
- * projects an edge drag onto one of uCrop's corner gestures while holding the
- * perpendicular coordinate fixed. The result is conventional rectangle
- * resizing without replacing uCrop's crop, scale, rotate, or ratio logic.
+ * 为 uCrop 自由裁剪框补充四条边的拖动区域。边拖动会映射为对应角点手势并固定垂直坐标，
+ * 从而实现常规矩形缩放，同时继续复用 uCrop 原有的裁剪、缩放、旋转和比例逻辑。
  */
 class EdgeHandleUCropActivity : UCropActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -171,8 +165,7 @@ private class CropEdgeTouchLayer(
             return false
         }
 
-        // OverlayView resets its internal drag state on ACTION_UP rather than
-        // ACTION_CANCEL, so end the synthetic corner gesture cleanly.
+        // OverlayView 只在 ACTION_UP 重置内部拖动状态，因此合成角点手势也用 ACTION_UP 正常收尾。
         val point = lastProjectedPoint
             ?: Point(event.x, event.y)
 
@@ -214,8 +207,7 @@ private class CropEdgeTouchLayer(
         y: Float,
     ): Edge? {
         if (isNearCorner(cropRect, x, y)) {
-            // Let uCrop handle real corner drags. Its native behavior already
-            // keeps the two opposite sides fixed.
+            // 真正的角点拖动继续交给 uCrop 原生处理，其本身会固定另外两条边。
             return null
         }
 

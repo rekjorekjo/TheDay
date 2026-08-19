@@ -79,12 +79,6 @@ class _GlassShellState extends State<GlassShell> {
   }
 
   void _handleEventSaved(DayEventModel? event) {
-    final snapshot = widget.controller.snapshot;
-    final hiddenByPastFilter = event != null &&
-        snapshot != null &&
-        !snapshot.settings.showPastEvents &&
-        !snapshot.orderedEventIds.contains(event.id);
-
     setState(() {
       selectedIndex = 0;
       editorGeneration += 1;
@@ -94,19 +88,6 @@ class _GlassShellState extends State<GlassShell> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _openEvent(event);
-        if (hiddenByPastFilter) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(
-                const SnackBar(
-                  content: Text('已保存。过去的日子已按当前设置从首页隐藏。'),
-                  duration: Duration(seconds: 3),
-                ),
-              );
-          });
-        }
       });
     }
   }

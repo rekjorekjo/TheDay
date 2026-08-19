@@ -1,6 +1,8 @@
 package io.github.thedayapp.ui.screens
 
 import android.content.Context
+import android.content.res.Resources
+import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -24,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.thedayapp.R
 import io.github.thedayapp.ui.documents.AppDocument
+import java.io.IOException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +76,11 @@ private fun loadDocumentContent(context: Context, document: AppDocument): String
         context.resources.openRawResource(document.resourceId)
             .bufferedReader()
             .use { it.readText() }
-    } catch (e: Exception) {
+    } catch (exception: Resources.NotFoundException) {
+        Log.w("DocumentViewer", "Document resource was not found", exception)
+        null
+    } catch (exception: IOException) {
+        Log.w("DocumentViewer", "Failed to read document resource", exception)
         null
     }
 }

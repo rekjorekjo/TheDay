@@ -160,9 +160,9 @@ internal object WidgetImageRenderer {
 
             canvas.restoreToCount(saveCount)
 
-            val result = outputBitmap
+            val renderedBitmap = outputBitmap
             outputBitmap = null
-            return result
+            return renderedBitmap
         } catch (exception: Exception) {
             Log.w("TheDayWidget", "Failed to render widget background", exception)
             return null

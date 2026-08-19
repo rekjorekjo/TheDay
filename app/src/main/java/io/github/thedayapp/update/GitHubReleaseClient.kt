@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -29,7 +30,7 @@ class GitHubReleaseClient {
             while (bytes > 0) {
                 totalRead += bytes
                 if (totalRead > maxBytes) {
-                    throw Exception("Response too large")
+                    throw IOException("Response too large")
                 }
                 outputStream.write(buffer, 0, bytes)
                 bytes = input.read(buffer)
@@ -52,7 +53,7 @@ class GitHubReleaseClient {
         try {
             val responseCode = connection.responseCode
             if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw Exception("HTTP $responseCode")
+                throw IOException("HTTP $responseCode")
             }
 
             val bytes = readLimited(connection, MAX_RESPONSE_SIZE)
@@ -60,16 +61,16 @@ class GitHubReleaseClient {
             val json = JSONObject(String(bytes, Charsets.UTF_8))
 
             if (json.optBoolean("draft", false)) {
-                throw Exception("Release is draft")
+                throw IOException("Release is draft")
             }
 
             if (json.optBoolean("prerelease", false)) {
-                throw Exception("Release is prerelease")
+                throw IOException("Release is prerelease")
             }
 
             val tagName = json.getString("tag_name")
             if (!tagName.matches(Regex("^v\\d+\\.\\d+\\.\\d+$"))) {
-                throw Exception("Invalid tagName: $tagName")
+                throw IOException("Invalid tagName: $tagName")
             }
 
             val versionName = tagName.substring(1)
@@ -90,11 +91,11 @@ class GitHubReleaseClient {
             }
 
             if (apkCount == 0) {
-                throw Exception("APK asset not found")
+                throw IOException("APK asset not found")
             }
 
             if (apkCount > 1) {
-                throw Exception("Multiple APK assets found")
+                throw IOException("Multiple APK assets found")
             }
 
             val apkName = apkAsset!!.getString("name")
@@ -102,48 +103,48 @@ class GitHubReleaseClient {
             val apkSize = apkAsset.getLong("size")
 
             if (apkSize <= 0) {
-                throw Exception("Invalid APK size")
+                throw IOException("Invalid APK size")
             }
 
             val url = URL(apkDownloadUrl)
 
             if (url.protocol != "https") {
-                throw Exception("APK URL must use HTTPS")
+                throw IOException("APK URL must use HTTPS")
             }
 
             if (!url.host.equals("github.com", ignoreCase = true)) {
-                throw Exception("APK URL host must be github.com")
+                throw IOException("APK URL host must be github.com")
             }
 
             if (url.query != null) {
-                throw Exception("APK URL must not have query")
+                throw IOException("APK URL must not have query")
             }
 
             if (url.ref != null) {
-                throw Exception("APK URL must not have fragment")
+                throw IOException("APK URL must not have fragment")
             }
 
             if (url.userInfo != null) {
-                throw Exception("APK URL must not have userInfo")
+                throw IOException("APK URL must not have userInfo")
             }
 
             if (url.port != -1) {
-                throw Exception("APK URL must not have explicit port")
+                throw IOException("APK URL must not have explicit port")
             }
 
             val expectedPath = "/rekjorekjo/TheDay/releases/download/$tagName/$apkName"
             if (url.path != expectedPath) {
-                throw Exception("APK URL path mismatch")
+                throw IOException("APK URL path mismatch")
             }
 
             val digest = apkAsset.optString("digest", "")
             if (!digest.startsWith("sha256:")) {
-                throw Exception("Missing or invalid digest")
+                throw IOException("Missing or invalid digest")
             }
 
             val sha256 = digest.substring(7).lowercase()
             if (!sha256.matches(Regex("^[a-f0-9]{64}$"))) {
-                throw Exception("Invalid SHA-256 digest")
+                throw IOException("Invalid SHA-256 digest")
             }
 
             GitHubRelease(

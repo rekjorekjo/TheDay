@@ -99,7 +99,7 @@ class _LaunchSurface extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'THE DAY',
+                '此日',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       letterSpacing: 3.0,
                       fontWeight: FontWeight.w700,

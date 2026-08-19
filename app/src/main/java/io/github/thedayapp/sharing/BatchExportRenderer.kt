@@ -308,9 +308,7 @@ object BatchExportRenderer {
             1.50f
         }
 
-        // The detail cards all share a width, but their heights follow each
-        // image ratio. These are the same 0.60..1.50 bounds used by the detail
-        // preview, so landscape and portrait cards remain visibly different.
+        // 详情卡片宽度统一，高度按原图比例变化；比例范围与详情预览一致，保留横竖图的视觉差异。
         val boundedAspectRatio = imageAspectRatio
             .takeIf { ratio -> ratio.isFinite() && ratio > 0f }
             ?.coerceIn(0.60f, 1.50f)
@@ -375,7 +373,7 @@ object BatchExportRenderer {
         showDate: Boolean,
     ) {
         val centerX = PAGE_WIDTH / 2f
-        val headerTitle = title?.trim().orEmpty().ifBlank { "The Day" }
+        val headerTitle = title?.trim().orEmpty().ifBlank { "此日" }
         val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.onSurface
             textSize = 66f
@@ -392,9 +390,7 @@ object BatchExportRenderer {
             )
         }
 
-        // The title remains centered in the middle layer. The date is no
-        // longer treated as a subtitle; it uses the exact gilded top-right
-        // renderer from the single memorial image.
+        // 标题保持居中；日期复用单张纪念图的右上角金色日期绘制方式，不再作为副标题排版。
         canvas.drawText(
             headerTitle,
             centerX,

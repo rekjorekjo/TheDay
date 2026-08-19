@@ -76,7 +76,8 @@ class EventDetailScreen extends StatelessWidget {
           const SnackBar(content: Text('已保存到相册')),
         );
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('分享纪念图失败: $error');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('分享失败')),
@@ -229,7 +230,8 @@ class EventDetailScreen extends StatelessWidget {
                             onTap: () async {
                               try {
                                 await controller.pinWidget(event.id);
-                              } catch (_) {
+                              } catch (error) {
+                                debugPrint('添加桌面小组件失败: $error');
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(content: Text('无法添加小组件')),
@@ -296,7 +298,8 @@ class _MemoryImageSheetState extends State<_MemoryImageSheet> {
         previewPath = path;
         loading = false;
       });
-    } catch (_) {
+    } catch (error) {
+      debugPrint('生成纪念图预览失败: $error');
       if (!mounted || generation != renderGeneration) return;
       setState(() {
         loading = false;

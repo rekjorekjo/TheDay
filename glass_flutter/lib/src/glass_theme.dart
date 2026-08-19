@@ -82,11 +82,7 @@ class GlassPredictiveBackPageTransitionsBuilder
       child,
     );
 
-    // 150 ms is long enough to read as a deliberate transition instead of a
-    // one-frame ghost, while still feeling materially faster than the forward
-    // route. On pop the old page stays fully opaque for the first few frames,
-    // then exits cleanly before the final settle so the prepared snapshot below
-    // is never perceived as a second copy of the same page.
+    // 返回动画控制在 150ms：前几帧保持旧页面完整可见，再快速退出，避免预备快照被看成页面重影。
     final opacity = CurvedAnimation(
       parent: animation,
       curve: const Interval(0.0, 1.0, curve: Curves.easeOutCubic),

@@ -15,13 +15,8 @@ private const val HOME_HERO_PREVIEW_MAX_ASPECT_RATIO = 1.65f
 private const val DETAIL_PREVIEW_MAX_ASPECT_RATIO = 1.50f
 
 /**
- * Returns the minimum height needed to preserve the selected image ratio.
- *
- * The caller should apply this as a minimum rather than an exact height. That
- * lets the card's text content grow naturally when a very wide image would
- * otherwise make the card too short. Extremely tall images are capped by a
- * minimum supported aspect ratio so one card cannot occupy an unreasonable
- * amount of vertical space.
+ * 根据所选图片比例计算卡片最小高度。调用方把它作为下限而非固定高度，
+ * 让文字内容仍可自然撑开；极端竖图会受最小宽高比限制，避免单张卡片占据过多纵向空间。
  */
 internal fun adaptiveEventImageMinimumHeight(
     availableWidth: Dp,
@@ -45,9 +40,7 @@ internal fun adaptiveEventImageMinimumHeight(
 }
 
 /**
- * Gives the focus dialog a close approximation of the card shape users will
- * see. The upper bound represents the natural text-driven height of each card;
- * wider images keep that safe card shape instead of squeezing the text.
+ * 为图片位置调整面板提供接近实际卡片的预览比例；宽图仍保留文字所需的安全卡片高度。
  */
 internal fun adaptiveEventImagePreviewAspectRatio(
     image: LocalImageReference,

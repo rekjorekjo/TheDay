@@ -11,9 +11,8 @@ import kotlin.math.ceil
 import kotlin.math.max
 
 /**
- * Renders the widget count as a bitmap with a visible but static halo.
- * RemoteViews cannot run Compose animations reliably, so the glow is baked
- * into the bitmap while the glyph fill keeps the normal widget text color.
+ * 将小组件计数渲染为带静态光晕的位图。RemoteViews 无法可靠运行 Compose 动画，
+ * 因此把光效直接烘焙到位图中，同时保持数字本身的正常文字颜色。
  */
 internal object WidgetCountGlowRenderer {
     fun render(

@@ -35,7 +35,7 @@ class GlassEdgeEffects extends ChangeNotifier {
     if (!_enabled || !x.isFinite || !y.isFinite) return;
     final nextX = x.clamp(-1.0, 1.0).toDouble();
     final nextY = y.clamp(-1.0, 1.0).toDouble();
-    // A small Flutter-side low-pass keeps tiny sensor noise out of the rim.
+    // Flutter 侧做轻量低通处理，过滤传感器微小抖动，避免边缘反射持续闪动。
     final oldX = _tiltX;
     final oldY = _tiltY;
     _tiltX += (nextX - _tiltX) * 0.22;
@@ -68,7 +68,7 @@ class GlassEdgeEffects extends ChangeNotifier {
     _glintFrames = Timer.periodic(const Duration(milliseconds: frameMs), (timer) {
       elapsed += frameMs;
       final t = (elapsed / durationMs).clamp(0.0, 1.0).toDouble();
-      // Smooth ends so the highlight arrives/leaves without a hard flash.
+      // 对首尾做平滑过渡，避免高光进入或离开时突然闪烁。
       _glint = 0.5 - (math.cos(t * math.pi) * 0.5);
       notifyListeners();
       if (elapsed >= durationMs) {

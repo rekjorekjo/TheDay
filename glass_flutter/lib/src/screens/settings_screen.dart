@@ -99,18 +99,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickReminderTime(GlassSettings settings) async {
-    final value = await showTimePicker(
+    final snapshot = widget.controller.snapshot!;
+    final selectedTime = await showDialog<TimeOfDay>(
       context: context,
-      initialTime: TimeOfDay(
-        hour: settings.reminderHour,
-        minute: settings.reminderMinute,
+      barrierColor: Colors.black.withAlpha(snapshot.isDark ? 112 : 72),
+      builder: (dialogContext) => _GlassReminderTimeDialog(
+        snapshot: snapshot,
+        initialTime: TimeOfDay(
+          hour: settings.reminderHour,
+          minute: settings.reminderMinute,
+        ),
       ),
     );
-    if (value != null) {
+    if (selectedTime != null) {
       await _commit(
         settings.copyWith(
-          reminderHour: value.hour,
-          reminderMinute: value.minute,
+          reminderHour: selectedTime.hour,
+          reminderMinute: selectedTime.minute,
         ),
       );
     }
@@ -174,7 +179,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Text('设置', style: Theme.of(context).textTheme.titleLarge),
                     ),
                     IconButton(
-                      tooltip: '关于 The Day',
+                      tooltip: '关于此日',
                       onPressed: widget.onOpenAbout,
                       icon: const Icon(Icons.more_horiz_rounded),
                     ),
@@ -344,15 +349,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Text(settings.sortDirection == 'ASCENDING' ? '升序' : '降序'),
                     ),
                   ),
-                  _Divider(snapshot: snapshot),
-                  _SettingRow(
-                    title: '显示正数日',
-                    subtitle: '关闭后，首页和小组件只显示倒数日和今天',
-                    trailing: Switch(
-                      value: settings.showPastEvents,
-                      onChanged: (value) => _commit(settings.copyWith(showPastEvents: value)),
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -403,6 +399,235 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+class _GlassReminderTimeDialog extends StatefulWidget {
+  const _GlassReminderTimeDialog({
+    required this.snapshot,
+    required this.initialTime,
+  });
+
+  final AppSnapshot snapshot;
+  final TimeOfDay initialTime;
+
+  @override
+  State<_GlassReminderTimeDialog> createState() => _GlassReminderTimeDialogState();
+}
+
+class _GlassReminderTimeDialogState extends State<_GlassReminderTimeDialog> {
+  late int hour;
+  late int minute;
+  late final FixedExtentScrollController hourController;
+  late final FixedExtentScrollController minuteController;
+
+  @override
+  void initState() {
+    super.initState();
+    hour = widget.initialTime.hour;
+    minute = widget.initialTime.minute;
+    hourController = FixedExtentScrollController(initialItem: hour);
+    minuteController = FixedExtentScrollController(initialItem: minute);
+  }
+
+  @override
+  void dispose() {
+    hourController.dispose();
+    minuteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final timeText = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: GlassSurface(
+          isDark: widget.snapshot.isDark,
+          clarity: widget.snapshot.settings.glassClarity,
+          radius: 30,
+          borderOpacityScale: 1.12,
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: withOpacitySafe(scheme.primary, 0.13),
+                      border: Border.all(color: withOpacitySafe(scheme.primary, 0.32)),
+                    ),
+                    child: Icon(Icons.alarm_rounded, color: scheme.primary, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('提醒时间', style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: 2),
+                        Text(
+                          '统一用于所有本地提醒',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: Text(
+                  timeText,
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 210,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IgnorePointer(
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: withOpacitySafe(scheme.primary, 0.10),
+                          border: Border.all(
+                            color: withOpacitySafe(scheme.primary, 0.34),
+                            width: 0.9,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _TimeWheel(
+                            controller: hourController,
+                            itemCount: 24,
+                            selected: hour,
+                            onSelected: (value) => setState(() => hour = value),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            ':',
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  color: scheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                        Expanded(
+                          child: _TimeWheel(
+                            controller: minuteController,
+                            itemCount: 60,
+                            selected: minute,
+                            onSelected: (value) => setState(() => minute = value),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Text('取消'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(context).pop(TimeOfDay(hour: hour, minute: minute)),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Text('确定'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeWheel extends StatelessWidget {
+  const _TimeWheel({
+    required this.controller,
+    required this.itemCount,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final FixedExtentScrollController controller;
+  final int itemCount;
+  final int selected;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListWheelScrollView.useDelegate(
+      controller: controller,
+      itemExtent: 44,
+      diameterRatio: 1.55,
+      perspective: 0.003,
+      physics: const FixedExtentScrollPhysics(),
+      onSelectedItemChanged: onSelected,
+      childDelegate: ListWheelChildBuilderDelegate(
+        childCount: itemCount,
+        builder: (context, index) {
+          final active = index == selected;
+          return Center(
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 120),
+              style: (active
+                      ? Theme.of(context).textTheme.titleLarge
+                      : Theme.of(context).textTheme.bodyLarge)
+                  ?.copyWith(
+                    color: active ? scheme.onSurface : scheme.onSurfaceVariant.withAlpha(145),
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  ) ??
+                  const TextStyle(),
+              child: Text(index.toString().padLeft(2, '0')),
+            ),
+          );
+        },
+      ),
     );
   }
 }

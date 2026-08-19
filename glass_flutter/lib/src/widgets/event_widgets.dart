@@ -200,9 +200,7 @@ class HeroEventCard extends StatelessWidget {
         child: content,
       );
     } else {
-      // Photo hero cards should share the same physical edge and elevation as
-      // the rest of the glass system without adding blur or a translucent fill
-      // on top of the image itself.
+      // 图片主卡片沿用 Glass 的边缘和层次，但不在图片上叠加额外模糊或半透明填充。
       content = GlassSurface(
         isDark: isDark,
         clarity: 100,

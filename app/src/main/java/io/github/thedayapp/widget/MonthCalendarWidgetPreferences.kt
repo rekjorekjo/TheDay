@@ -2,6 +2,7 @@ package io.github.thedayapp.widget
 
 import android.content.Context
 import java.time.YearMonth
+import java.time.format.DateTimeParseException
 
 object MonthCalendarWidgetPreferences {
 
@@ -19,7 +20,8 @@ object MonthCalendarWidgetPreferences {
         return if (monthString != null) {
             try {
                 YearMonth.parse(monthString)
-            } catch (_: Exception) {
+            } catch (_: DateTimeParseException) {
+                // 旧配置或损坏数据无法解析时回到当前月份，不影响小组件继续使用。
                 fallback
             }
         } else {

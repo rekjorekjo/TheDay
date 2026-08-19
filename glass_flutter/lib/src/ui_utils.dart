@@ -5,8 +5,8 @@ import 'models.dart';
 const String unclassifiedCategoryName = '未分类';
 
 String normalizedCategory(String raw) {
-  final value = raw.trim();
-  return value.isEmpty ? unclassifiedCategoryName : value;
+  final normalized = raw.trim();
+  return normalized.isEmpty ? unclassifiedCategoryName : normalized;
 }
 
 String compactDateText(DateTime date) => '${date.year}年${date.month}月${date.day}日';

@@ -427,7 +427,7 @@ class _BlockedEdgePainter extends CustomPainter {
         break;
     }
 
-    // A wider translucent stroke creates a light Glass glow without a broad blur.
+    // 使用较宽的半透明描边形成轻微 Glass 光晕，避免大范围模糊影响图片内容。
     canvas.drawLine(
       start,
       end,

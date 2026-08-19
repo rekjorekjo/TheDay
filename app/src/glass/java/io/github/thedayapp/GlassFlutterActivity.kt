@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import androidx.core.view.WindowCompat
 import com.yalantis.ucrop.UCrop
 import io.flutter.embedding.android.FlutterActivity
@@ -565,14 +566,14 @@ class GlassFlutterActivity : FlutterActivity() {
         }
         val action = json.optString("action", "SHARE")
         val template = memoryTemplate(json.optString("template"))
-        val title = json.optString("title").trim().takeIf { it.isNotEmpty() } ?: "里程碑"
+        val title = json.optString("title").trim().takeIf { it.isNotEmpty() } ?: "纪念碑"
         val exportStyle = glassExportStyle(json)
         val events = selected.map { milestone ->
             io.github.thedayapp.data.DayEvent(
                 id = milestone.id,
                 title = milestone.title,
                 date = milestone.date,
-                category = "里程碑",
+                category = "纪念碑",
                 note = milestone.note,
                 createdAtEpochMillis = milestone.createdAtEpochMillis,
             )
@@ -648,7 +649,9 @@ class GlassFlutterActivity : FlutterActivity() {
                     cacheDir.listFiles { candidate ->
                         candidate.name.startsWith(previewPrefix) && candidate != file
                     }?.forEach { candidate ->
-                        runCatching { candidate.delete() }
+                        if (!candidate.delete()) {
+                            Log.d(TAG, "Old memory preview could not be deleted: ${candidate.name}")
+                        }
                     }
                     file.outputStream().buffered().use { output ->
                         if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
@@ -936,28 +939,39 @@ class GlassFlutterActivity : FlutterActivity() {
     }
 
     private fun finishImagePick(value: String?) {
-        val result = imagePickResult
+        val pendingResult = imagePickResult
         imagePickResult = null
-        result?.success(value)
+        pendingResult?.success(value)
         clearPickerFiles()
     }
 
     private fun finishImagePickWithError(error: Throwable?) {
-        val result = imagePickResult
+        val pendingResult = imagePickResult
         imagePickResult = null
-        result?.error("image_failed", error?.message ?: "Image operation failed", null)
+        pendingResult?.error("image_failed", error?.message ?: "Image operation failed", null)
         clearPickerFiles()
     }
 
     private fun clearPickerFiles() {
         if (pendingSourceTemporary) {
-            pendingSourceUri?.path?.let { runCatching { File(it).delete() } }
+            pendingSourceUri?.path?.let { path -> deletePickerFile(path) }
         }
-        pendingCropUri?.path?.let { runCatching { File(it).delete() } }
+        pendingCropUri?.path?.let { path -> deletePickerFile(path) }
         pendingSourceUri = null
         pendingCropUri = null
         pendingRecropImage = null
         pendingSourceTemporary = false
+    }
+
+    private fun deletePickerFile(path: String) {
+        try {
+            val file = File(path)
+            if (file.exists() && !file.delete()) {
+                Log.d(TAG, "Picker file could not be deleted: ${file.name}")
+            }
+        } catch (exception: SecurityException) {
+            Log.w(TAG, "Failed to delete picker file", exception)
+        }
     }
 
     private fun requestInitialNotificationPermissionIfNeeded() {
@@ -1031,8 +1045,7 @@ class GlassFlutterActivity : FlutterActivity() {
         )
     }
 
-    // Glass is intentionally a dark-only visual system. Keep the persisted ThemeMode
-    // untouched so Classic can continue to honor the user's Classic appearance choice.
+    // Glass 固定采用深色视觉，但不改写持久化 ThemeMode，确保切回 Classic 后仍保留用户原有外观选择。
     private fun resolveDarkMode(): Boolean = true
 
     private fun notificationGranted(): Boolean {
@@ -1042,6 +1055,7 @@ class GlassFlutterActivity : FlutterActivity() {
     }
 
     companion object {
+        private const val TAG = "GlassFlutterActivity"
         const val CHANNEL_NAME = "io.github.thedayapp/glass"
         private const val REQUEST_NOTIFICATIONS = 7101
         private const val REQUEST_PICK_IMAGE = 7102

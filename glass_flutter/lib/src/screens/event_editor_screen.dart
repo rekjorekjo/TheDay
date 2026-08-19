@@ -100,8 +100,9 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
       } else {
         await widget.controller.saveNewEventDraft(_draftModel());
       }
-    } catch (_) {
-      // Draft persistence is best-effort and must never block editing.
+    } catch (error) {
+      // 草稿保存失败不阻塞当前编辑；正式保存时仍会再次提交完整数据。
+      debugPrint('保存新建日子草稿失败: $error');
     }
   }
 
@@ -132,7 +133,8 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
         setState(() => image = picked);
         await _persistDraftNow();
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('选择事件图片失败: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('图片处理失败')),
@@ -153,7 +155,8 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
         setState(() => image = picked);
         await _persistDraftNow();
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('重新裁剪事件图片失败: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('图片处理失败')),
@@ -210,13 +213,13 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
     draftPersistenceEnabled = false;
     setState(() => saving = true);
     try {
-      // Match Classic: choosing a reminder should request Android notification
-      // permission, but declining the permission must not block saving the event.
+      // 与 Classic 保持一致：设置提醒时尝试申请通知权限，但用户拒绝权限不能阻止事件本身保存。
       if (reminderDays >= 0 && !widget.controller.snapshot!.notificationGranted) {
         try {
           await widget.controller.requestNotificationPermission();
-        } catch (_) {
-          // Keep the reminder setting; Settings can request permission later.
+        } catch (error) {
+          // 保留提醒设置，用户之后仍可在设置页重新申请通知权限。
+          debugPrint('请求通知权限失败: $error');
         }
       }
       final saved = await widget.controller.saveEvent(<String, dynamic>{
@@ -238,7 +241,8 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
         throw StateError('Native save returned a different event date');
       }
       if (mounted) widget.onSaved(saved);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('保存事件失败: $error');
       draftPersistenceEnabled = true;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -293,7 +297,7 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Keep the field grouping and order exactly aligned with Classic.
+              // 字段分组和顺序与 Classic 保持一致，减少双 Edition 之间的操作差异。
               GlassSurface(
                 isDark: snapshot.isDark,
                 clarity: clarity,

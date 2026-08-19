@@ -44,8 +44,9 @@ class _AboutScreenState extends State<AboutScreen> {
     try {
       final status = await widget.controller.getUpdateStatus();
       if (mounted) setState(() => updateStatus = status);
-    } catch (_) {
-      // Keep the About page quiet if update status cannot be read.
+    } catch (error) {
+      // 后台状态读取失败时保持当前页面可用，下一次轮询会再次尝试。
+      debugPrint('读取更新状态失败: $error');
     }
   }
 
@@ -63,7 +64,8 @@ class _AboutScreenState extends State<AboutScreen> {
         final status = await widget.controller.checkForUpdate();
         if (mounted) setState(() => updateStatus = status);
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('检查更新失败: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('检查更新失败')),
@@ -78,7 +80,14 @@ class _AboutScreenState extends State<AboutScreen> {
     try {
       final status = await widget.controller.setUpdateWifiOnly(value);
       if (mounted) setState(() => updateStatus = status);
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('更新 Wi-Fi 下载设置失败: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('设置失败，请稍后重试')),
+        );
+      }
+    }
   }
 
   @override
@@ -120,7 +129,7 @@ class _AboutScreenState extends State<AboutScreen> {
                           child: Image.asset('assets/app_icon.png', width: 82, height: 82),
                         ),
                         const SizedBox(height: 12),
-                        Text('The Day', style: Theme.of(context).textTheme.headlineMedium),
+                        Text('此日', style: Theme.of(context).textTheme.headlineMedium),
                         const SizedBox(height: 4),
                         Text('当前版本 ${snapshot.versionName}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                       ],
@@ -191,9 +200,7 @@ class _AboutScreenState extends State<AboutScreen> {
     final status = updateStatus;
     if (status == null) return const Text('当前已是最新版本');
 
-    // A manual check result is newer information than a persisted download state.
-    // This prevents an old FAILED download from making every later successful
-    // check look like an immediate failure.
+    // 手动检查结果比持久化下载状态更新，避免旧的 FAILED 下载记录覆盖后续成功检查。
     if (status.extra == 'UP_TO_DATE') return const Text('当前已是最新版本');
     if (status.extra == 'CHECK_FAILED') return const Text('检查失败');
     if (status.extra == 'DOWNLOAD_FAILED') return const Text('重试');

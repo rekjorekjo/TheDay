@@ -1,5 +1,7 @@
 package io.github.thedayapp.update
 
+import java.io.IOException
+
 import io.github.thedayapp.BuildConfig
 
 enum class UpdateEdition(val value: String) {
@@ -38,14 +40,14 @@ object UpdateChannel {
     ) {
         if (targetEdition == UpdateEdition.GLASS) {
             if (value != "glass") {
-                throw Exception("Manifest edition mismatch: expected glass")
+                throw IOException("Manifest edition mismatch: expected glass")
             }
             return
         }
 
-        // Classic accepts an omitted edition field so older latest.json files remain valid.
+        // Classic 兼容缺少 edition 字段的旧版 latest.json，避免历史发布清单失效。
         if (value.isNotEmpty() && value != "classic") {
-            throw Exception("Manifest edition mismatch: expected classic")
+            throw IOException("Manifest edition mismatch: expected classic")
         }
     }
 }

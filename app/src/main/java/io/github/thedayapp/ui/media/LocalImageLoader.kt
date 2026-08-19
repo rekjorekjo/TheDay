@@ -2,6 +2,7 @@ package io.github.thedayapp.ui.media
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import android.util.LruCache
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,9 +26,8 @@ private data class CachedLocalImage(
 )
 
 /**
- * Keeps recently decoded images alive across screen changes and lazy-list
- * disposal. File names are unique, so a new crop naturally receives a new
- * cache key and cannot reuse stale pixels.
+ * 在页面切换和 Lazy 列表回收后保留近期解码结果。图片文件名唯一，重新裁剪会得到新缓存键，
+ * 因此不会错误复用旧像素。
  */
 private object LocalImageMemoryCache {
     private const val ABSOLUTE_MAX_BYTES = 64 * 1024 * 1024
@@ -235,7 +235,8 @@ private fun decodeLocalImage(
         }
 
         return scaledBitmap
-    } catch (_: Exception) {
+    } catch (exception: Exception) {
+        Log.w("TheDayImageLoader", "Failed to decode local image", exception)
         sampledBitmap?.let { bitmap ->
             if (!bitmap.isRecycled) {
                 bitmap.recycle()

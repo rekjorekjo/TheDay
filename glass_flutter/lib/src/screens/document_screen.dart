@@ -29,9 +29,10 @@ class _DocumentScreenState extends State<DocumentScreen> {
 
   Future<void> _load() async {
     try {
-      final value = await widget.controller.readDocument(widget.keyName);
-      if (mounted) setState(() => content = value);
-    } catch (_) {
+      final documentContent = await widget.controller.readDocument(widget.keyName);
+      if (mounted) setState(() => content = documentContent);
+    } catch (error) {
+      debugPrint('读取内置文档失败: $error');
       if (mounted) setState(() => content = '');
     }
   }

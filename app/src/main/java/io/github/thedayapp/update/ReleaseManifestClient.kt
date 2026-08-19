@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -29,7 +30,7 @@ class ReleaseManifestClient {
             while (bytes > 0) {
                 totalRead += bytes
                 if (totalRead > maxBytes) {
-                    throw Exception("Manifest too large")
+                    throw IOException("Manifest too large")
                 }
                 outputStream.write(buffer, 0, bytes)
                 bytes = input.read(buffer)
@@ -52,46 +53,46 @@ class ReleaseManifestClient {
         try {
             val responseCode = connection.responseCode
             if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw Exception("HTTP $responseCode")
+                throw IOException("HTTP $responseCode")
             }
 
             val contentLength = connection.contentLengthLong
             if (contentLength > MAX_MANIFEST_SIZE) {
-                throw Exception("Manifest too large")
+                throw IOException("Manifest too large")
             }
 
             val bytes = readLimited(connection, MAX_MANIFEST_SIZE)
 
             if (bytes.isEmpty()) {
-                throw Exception("Empty manifest")
+                throw IOException("Empty manifest")
             }
 
             val json = JSONObject(String(bytes, Charsets.UTF_8))
 
             val schemaVersion = json.getInt("schemaVersion")
             if (schemaVersion != 1) {
-                throw Exception("Unsupported schema version: $schemaVersion")
+                throw IOException("Unsupported schema version: $schemaVersion")
             }
 
             UpdateChannel.validateManifestEdition(json.optString("edition", ""), targetEdition)
 
             val tagName = json.getString("tagName")
             if (!tagName.matches(Regex("^v\\d+\\.\\d+\\.\\d+$"))) {
-                throw Exception("Invalid tagName: $tagName")
+                throw IOException("Invalid tagName: $tagName")
             }
 
             val versionName = json.getString("versionName")
             if (!versionName.matches(Regex("^\\d+\\.\\d+\\.\\d+$"))) {
-                throw Exception("Invalid versionName: $versionName")
+                throw IOException("Invalid versionName: $versionName")
             }
 
             if (tagName != "v$versionName") {
-                throw Exception("tagName and versionName mismatch")
+                throw IOException("tagName and versionName mismatch")
             }
 
             val versionCode = json.getLong("versionCode")
             if (versionCode <= 0) {
-                throw Exception("Invalid versionCode: $versionCode")
+                throw IOException("Invalid versionCode: $versionCode")
             }
 
             val releaseNotes = json.optString("releaseNotes", "")
@@ -102,50 +103,50 @@ class ReleaseManifestClient {
 
             val expectedApkName = UpdateChannel.apkAssetName(tagName, targetEdition)
             if (apkName != expectedApkName) {
-                throw Exception("Invalid APK name: $apkName")
+                throw IOException("Invalid APK name: $apkName")
             }
 
             val apkUrl = apk.getString("url")
             val apkSize = apk.getLong("size")
 
             if (apkSize <= 0 || apkSize > 200 * 1024 * 1024) {
-                throw Exception("Invalid APK size: $apkSize")
+                throw IOException("Invalid APK size: $apkSize")
             }
 
             val sha256 = apk.getString("sha256").lowercase()
             if (!sha256.matches(Regex("^[a-f0-9]{64}$"))) {
-                throw Exception("Invalid SHA-256: $sha256")
+                throw IOException("Invalid SHA-256: $sha256")
             }
 
             val apkUrlObj = URL(apkUrl)
 
             if (apkUrlObj.protocol != "https") {
-                throw Exception("APK URL must use HTTPS")
+                throw IOException("APK URL must use HTTPS")
             }
 
             if (!apkUrlObj.host.equals("github.com", ignoreCase = true)) {
-                throw Exception("APK URL host must be github.com")
+                throw IOException("APK URL host must be github.com")
             }
 
             if (apkUrlObj.query != null) {
-                throw Exception("APK URL must not have query")
+                throw IOException("APK URL must not have query")
             }
 
             if (apkUrlObj.ref != null) {
-                throw Exception("APK URL must not have fragment")
+                throw IOException("APK URL must not have fragment")
             }
 
             if (apkUrlObj.userInfo != null) {
-                throw Exception("APK URL must not have userInfo")
+                throw IOException("APK URL must not have userInfo")
             }
 
             if (apkUrlObj.port != -1) {
-                throw Exception("APK URL must not have explicit port")
+                throw IOException("APK URL must not have explicit port")
             }
 
             val expectedPath = "/rekjorekjo/TheDay/releases/download/$tagName/$apkName"
             if (apkUrlObj.path != expectedPath) {
-                throw Exception("APK URL path mismatch")
+                throw IOException("APK URL path mismatch")
             }
 
             GitHubRelease(

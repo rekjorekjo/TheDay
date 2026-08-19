@@ -514,6 +514,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                             : Column(
                                 children: [
                                   Expanded(
+                                    // 详情使用循环 PageView 保持连续翻阅；长按当前卡片进入操作模式。
                                     child: PageView.builder(
                                       controller: pageController,
                                       onPageChanged: (page) {

@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import io.github.thedayapp.MainActivity
 import io.github.thedayapp.R
 import io.github.thedayapp.data.DayRepository
@@ -17,6 +18,10 @@ import java.time.LocalDate
 import kotlin.math.abs
 
 class ReminderReceiver : BroadcastReceiver() {
+    companion object {
+        private const val TAG = "TheDayReminder"
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ReminderScheduler.ACTION_REMIND) return
         val eventId = intent.getStringExtra(ReminderScheduler.EXTRA_EVENT_ID) ?: return
@@ -54,9 +59,14 @@ class ReminderReceiver : BroadcastReceiver() {
             .setContentIntent(contentIntent)
             .build()
 
-        runCatching {
+        try {
             context.getSystemService(NotificationManager::class.java)
                 .notify(event.id.hashCode(), notification)
+        } catch (exception: SecurityException) {
+            Log.w(TAG, "Notification permission denied", exception)
+        } catch (exception: RuntimeException) {
+            // 通知失败不应中断后续的年度提醒续排和桌面小组件刷新。
+            Log.w(TAG, "Failed to post reminder notification", exception)
         }
 
         if (event.repeatMode == RepeatMode.YEARLY) {

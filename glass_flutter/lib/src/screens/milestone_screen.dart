@@ -19,7 +19,7 @@ class _MilestoneScreenState extends State<MilestoneScreen> {
   _MilestoneStep step = _MilestoneStep.list;
   final selected = <String>{};
   final exportOrder = <String>[];
-  final exportTitle = TextEditingController(text: '里程碑');
+  final exportTitle = TextEditingController(text: '纪念碑');
   static const String template = 'MINIMAL';
   String? workingAction;
   bool managingSelection = false;
@@ -58,8 +58,8 @@ class _MilestoneScreenState extends State<MilestoneScreen> {
     final yes = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('删除所选里程碑？'),
-        content: Text('将删除 ${selected.length} 个里程碑，此操作无法撤销。'),
+        title: const Text('删除所选纪念碑？'),
+        content: Text('将删除 ${selected.length} 个纪念碑，此操作无法撤销。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('取消')),
           TextButton(
@@ -85,14 +85,15 @@ class _MilestoneScreenState extends State<MilestoneScreen> {
         milestoneIds: exportOrder,
         action: action,
         template: template,
-        title: exportTitle.text.trim().isEmpty ? '里程碑' : exportTitle.text.trim(),
+        title: exportTitle.text.trim().isEmpty ? '纪念碑' : exportTitle.text.trim(),
       );
       if (action == 'SAVE' && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('已保存到相册')),
         );
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('纪念碑导出失败: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('导出失败')),
@@ -105,88 +106,12 @@ class _MilestoneScreenState extends State<MilestoneScreen> {
 
   Future<void> _createMilestone() async {
     final snapshot = widget.controller.snapshot!;
-    final title = TextEditingController();
-    final note = TextEditingController();
-    var date = snapshot.today;
-    final result = await showDialog<Map<String, dynamic>>(
+    final dialogResult = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setLocalState) => AlertDialog(
-          title: const Text('新增里程碑'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: title,
-                  autofocus: true,
-                  maxLength: 60,
-                  decoration: const InputDecoration(labelText: '名称', counterText: ''),
-                ),
-                const SizedBox(height: 12),
-                Material(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () async {
-                      final picked = await showGlassCalendarDatePicker(
-                        context: dialogContext,
-                        initialDate: date,
-                        firstDate: DateTime(1900),
-                        lastDate: DateTime(2200),
-                      );
-                      if (picked != null) setLocalState(() => date = picked);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '日期',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(longDateText(date), style: Theme.of(context).textTheme.titleMedium),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: note,
-                  minLines: 2,
-                  maxLines: 5,
-                  maxLength: 160,
-                  decoration: const InputDecoration(labelText: '备注', counterText: ''),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('取消')),
-            FilledButton(
-              onPressed: () {
-                if (title.text.trim().isEmpty) return;
-                Navigator.pop(dialogContext, <String, dynamic>{
-                  'title': title.text.trim(),
-                  'date': _iso(date),
-                  'note': note.text.trim(),
-                });
-              },
-              child: const Text('保存'),
-            ),
-          ],
-        ),
-      ),
+      barrierColor: Colors.black.withAlpha(snapshot.isDark ? 112 : 72),
+      builder: (_) => _NewMonumentDialog(snapshot: snapshot),
     );
-    title.dispose();
-    note.dispose();
-    if (result != null) await widget.controller.saveMilestone(result);
+    if (dialogResult != null) await widget.controller.saveMilestone(dialogResult);
   }
 
   void _back() {
@@ -269,6 +194,214 @@ class _MilestoneScreenState extends State<MilestoneScreen> {
       );
 }
 
+
+class _NewMonumentDialog extends StatefulWidget {
+  const _NewMonumentDialog({required this.snapshot});
+
+  final AppSnapshot snapshot;
+
+  @override
+  State<_NewMonumentDialog> createState() => _NewMonumentDialogState();
+}
+
+class _NewMonumentDialogState extends State<_NewMonumentDialog> {
+  final title = TextEditingController();
+  final note = TextEditingController();
+  late DateTime date;
+
+  @override
+  void initState() {
+    super.initState();
+    date = widget.snapshot.today;
+  }
+
+  @override
+  void dispose() {
+    title.dispose();
+    note.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showGlassCalendarDatePicker(
+      context: context,
+      initialDate: date,
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2200),
+      title: '纪念碑日期',
+    );
+    if (picked != null && mounted) setState(() => date = picked);
+  }
+
+  void _save() {
+    final trimmedTitle = title.text.trim();
+    if (trimmedTitle.isEmpty) return;
+    Navigator.of(context).pop(<String, dynamic>{
+      'title': trimmedTitle,
+      'date': _iso(date),
+      'note': note.text.trim(),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: GlassSurface(
+          isDark: widget.snapshot.isDark,
+          clarity: widget.snapshot.settings.glassClarity,
+          radius: 30,
+          borderOpacityScale: 1.12,
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: scheme.primary.withAlpha(34),
+                        border: Border.all(color: scheme.primary.withAlpha(82)),
+                      ),
+                      child: Icon(Icons.account_balance_rounded, color: scheme.primary, size: 21),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('新增纪念碑', style: Theme.of(context).textTheme.titleLarge),
+                          const SizedBox(height: 2),
+                          Text(
+                            '记录只属于纪念碑页面的阶段节点',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: title,
+                  autofocus: true,
+                  maxLength: 60,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: '名称',
+                    hintText: '例如：第一次旅行',
+                    counterText: '',
+                    prefixIcon: Icon(Icons.edit_rounded),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GlassSurface(
+                  isDark: widget.snapshot.isDark,
+                  clarity: widget.snapshot.settings.glassClarity,
+                  blur: false,
+                  radius: 18,
+                  borderOpacityScale: 0.82,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _pickDate,
+                      borderRadius: BorderRadius.circular(18),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        child: Row(
+                          children: [
+                            Icon(Icons.event_rounded, color: scheme.primary, size: 21),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '日期',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    longDateText(date),
+                                    style: Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: note,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 160,
+                  decoration: const InputDecoration(
+                    labelText: '备注',
+                    hintText: '可以留空',
+                    counterText: '',
+                    alignLabelWithHint: true,
+                    prefixIcon: Padding(
+                      padding: EdgeInsets.only(bottom: 44),
+                      child: Icon(Icons.notes_rounded),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Text('取消'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _save,
+                        icon: const Icon(Icons.add_rounded, size: 19),
+                        label: const Text('添加'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MilestoneTopBar extends StatelessWidget {
   const _MilestoneTopBar({
     required this.step,
@@ -289,10 +422,10 @@ class _MilestoneTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final title = switch (step) {
       _MilestoneStep.list => selectionMode
-          ? (selectedCount > 0 ? '已选 $selectedCount' : '选择里程碑')
-          : '里程碑',
+          ? (selectedCount > 0 ? '已选 $selectedCount' : '选择纪念碑')
+          : '纪念碑',
       _MilestoneStep.sort => '调整顺序',
-      _MilestoneStep.settings => '导出里程碑',
+      _MilestoneStep.settings => '导出纪念碑',
     };
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 6, 18, 8),
@@ -301,7 +434,7 @@ class _MilestoneTopBar extends StatelessWidget {
           IconButton(tooltip: '返回', onPressed: onBack, icon: const Icon(Icons.arrow_back_rounded)),
           const SizedBox(width: 4),
           Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
-          if (onAdd != null) IconButton(tooltip: '新增里程碑', onPressed: onAdd, icon: const Icon(Icons.add_rounded)),
+          if (onAdd != null) IconButton(tooltip: '新增纪念碑', onPressed: onAdd, icon: const Icon(Icons.add_rounded)),
           if (onConfirm != null) TextButton(onPressed: onConfirm, child: const Text('确认')),
         ],
       ),
@@ -351,7 +484,7 @@ class _MilestoneListPage extends StatelessWidget {
           ),
           itemCount: snapshot.milestones.length + 2,
           onReorder: (oldIndex, newIndex) async {
-            // Header/progress and optional empty row are not draggable.
+            // 顶部说明、进度区域和可选空白行不参与拖动排序。
             if (oldIndex < 1 || oldIndex > snapshot.milestones.length) return;
             final milestoneOldIndex = oldIndex - 1;
             var milestoneNewIndex = newIndex - 1;
@@ -382,7 +515,7 @@ class _MilestoneListPage extends StatelessWidget {
                     ? Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          '还没有里程碑',
+                          '还没有纪念碑',
                           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
@@ -670,7 +803,7 @@ class _MilestoneSettingsPage extends StatelessWidget {
       children: [
         TextField(controller: title, decoration: const InputDecoration(labelText: '标题')),
         const SizedBox(height: 20),
-        Text('已选择 $selectedCount 个里程碑', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        Text('已选择 $selectedCount 个纪念碑', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         const SizedBox(height: 14),
         Row(
           children: [

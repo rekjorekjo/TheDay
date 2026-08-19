@@ -50,7 +50,7 @@ class ToolsScreen extends StatelessWidget {
               const SizedBox(height: 18),
               _ToolCard(snapshot: snapshot, icon: Icons.ios_share_rounded, title: '导出', onTap: onOpenExport),
               const SizedBox(height: 10),
-              _ToolCard(snapshot: snapshot, icon: Icons.flag_outlined, title: '里程碑', onTap: onOpenMilestones),
+              _ToolCard(snapshot: snapshot, icon: Icons.flag_outlined, title: '纪念碑', onTap: onOpenMilestones),
               const SizedBox(height: 10),
               _ToolCard(snapshot: snapshot, icon: Icons.calculate_outlined, title: '计算器', onTap: onOpenCalculator),
               const SizedBox(height: 10),

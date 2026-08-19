@@ -68,9 +68,7 @@ object EventMemoryImageRenderer {
     )
 
     /**
-     * Ratio used by the bottom-sheet preview before the rendered bitmap is
-     * ready. The 0.6:1 and 1.5:1 limits now apply directly to the exported
-     * memorial image itself.
+     * 导出位图尚未完成时供底部预览使用的宽高比；0.60～1.50 的限制与最终纪念图保持一致。
      */
     internal fun previewAspectRatio(
         image: LocalImageReference?,
@@ -839,7 +837,7 @@ object EventMemoryImageRenderer {
 
         val brandCenterY = topBand.centerY() + topBand.height() * 0.05f
         canvas.drawText(
-            "The Day",
+            "此日",
             canvasRect.centerX(),
             centeredBaseline(brandPaint, brandCenterY),
             brandPaint,
@@ -1865,7 +1863,7 @@ object EventMemoryImageRenderer {
 
         val textY = brandRect.top + brandRect.height() / 2f -
             (brandPaint.ascent() + brandPaint.descent()) / 2f
-        canvas.drawText("The Day", brandRect.centerX(), textY, brandPaint)
+        canvas.drawText("此日", brandRect.centerX(), textY, brandPaint)
     }
 
     private fun drawMainContent(

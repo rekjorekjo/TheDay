@@ -16,7 +16,6 @@ class GlassSettings {
     required this.backgroundTexture,
     required this.sortMode,
     required this.sortDirection,
-    required this.showPastEvents,
     required this.reminderHour,
     required this.reminderMinute,
   });
@@ -28,7 +27,6 @@ class GlassSettings {
   final String backgroundTexture;
   final String sortMode;
   final String sortDirection;
-  final bool showPastEvents;
   final int reminderHour;
   final int reminderMinute;
 
@@ -41,7 +39,6 @@ class GlassSettings {
       backgroundTexture: json['backgroundTexture'] as String? ?? 'DIAGONAL',
       sortMode: json['sortMode'] as String? ?? 'SMART',
       sortDirection: json['sortDirection'] as String? ?? 'ASCENDING',
-      showPastEvents: json['showPastEvents'] as bool? ?? true,
       reminderHour: (json['reminderHour'] as num? ?? 9).round().clamp(0, 23).toInt(),
       reminderMinute: (json['reminderMinute'] as num? ?? 0).round().clamp(0, 59).toInt(),
     );
@@ -55,7 +52,6 @@ class GlassSettings {
     String? backgroundTexture,
     String? sortMode,
     String? sortDirection,
-    bool? showPastEvents,
     int? reminderHour,
     int? reminderMinute,
   }) {
@@ -67,7 +63,6 @@ class GlassSettings {
       backgroundTexture: backgroundTexture ?? this.backgroundTexture,
       sortMode: sortMode ?? this.sortMode,
       sortDirection: sortDirection ?? this.sortDirection,
-      showPastEvents: showPastEvents ?? this.showPastEvents,
       reminderHour: reminderHour ?? this.reminderHour,
       reminderMinute: reminderMinute ?? this.reminderMinute,
     );
@@ -82,7 +77,6 @@ class GlassSettings {
         'backgroundTexture': backgroundTexture,
         'sortMode': sortMode,
         'sortDirection': sortDirection,
-        'showPastEvents': showPastEvents,
         'reminderHour': reminderHour,
         'reminderMinute': reminderMinute,
       };

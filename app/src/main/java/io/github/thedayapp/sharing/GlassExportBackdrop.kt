@@ -15,7 +15,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/** Draws the same Glass ambience used by Flutter into static exported bitmaps. */
+/** 在静态导出图片中复现 Flutter Glass 界面的环境背景。 */
 object GlassExportBackdrop {
     fun draw(canvas: Canvas, rect: RectF, style: GlassExportStyle) {
         if (rect.width() <= 0f || rect.height() <= 0f) return

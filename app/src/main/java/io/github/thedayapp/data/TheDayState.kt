@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -77,11 +78,15 @@ class TheDayState(context: Context) {
         val croppedResult = try {
             imageStore.importImage(croppedUri)
         } catch (exception: CancellationException) {
-            runCatching { imageStore.deleteImage(original.fileName) }
+            runBestEffort("cleanup original image after cancelled crop") {
+                imageStore.deleteImage(original.fileName)
+            }
             throw exception
         }
         if (croppedResult.isFailure) {
-            runCatching { imageStore.deleteImage(original.fileName) }
+            runBestEffort("cleanup original image after failed crop") {
+                imageStore.deleteImage(original.fileName)
+            }
             return Result.failure(
                 croppedResult.exceptionOrNull()
                     ?: IllegalStateException("Cropped image import failed"),
@@ -155,12 +160,10 @@ class TheDayState(context: Context) {
         }
         repository.saveEvents(events)
 
-        // Event persistence is the primary operation. Reminder/widget refreshes are
-        // best-effort side effects and must never make an already-saved event look
-        // like a failed save to the UI.
-        runCatching { ReminderScheduler.schedule(appContext, event, settings) }
-        runCatching { DayWidgetProvider.requestUpdate(appContext) }
-        runCatching { MonthCalendarWidgetProvider.requestUpdate(appContext) }
+        // 事件持久化是主操作；提醒和小组件刷新属于附加动作，失败时不能把已保存事件回滚成“保存失败”。
+        runBestEffort("schedule event reminder") { ReminderScheduler.schedule(appContext, event, settings) }
+        runBestEffort("refresh day widget") { DayWidgetProvider.requestUpdate(appContext) }
+        runBestEffort("refresh calendar widget") { MonthCalendarWidgetProvider.requestUpdate(appContext) }
 
         releaseImageFilesIfUnreferenced(
             previousImageFileNames - imageFileNames(event.backgroundImage),
@@ -262,9 +265,7 @@ class TheDayState(context: Context) {
     fun updateSettings(newSettings: AppSettings) {
         val previousSettings = settings
 
-        // Publish the new settings first so Compose can redraw the theme in the
-        // same frame. Expensive reminder work is now only performed when the
-        // reminder clock actually changes.
+        // 先发布新设置让 Compose 立即重绘；只有提醒时刻真正变化时才重新调度全部提醒。
         settings = newSettings
         repository.saveSettings(newSettings)
 
@@ -276,9 +277,7 @@ class TheDayState(context: Context) {
         }
 
         if (previousSettings != newSettings) {
-            // Defer widget broadcasts until after Compose has had a chance to
-            // render the new color scheme. This avoids the settings top bar
-            // briefly retaining the previous light/dark color.
+            // 延后一帧再刷新小组件，避免主题切换时设置页短暂残留上一套明暗配色。
             mainHandler.post {
                 DayWidgetProvider.requestUpdate(appContext)
                 MonthCalendarWidgetProvider.requestUpdate(appContext)
@@ -378,8 +377,12 @@ class TheDayState(context: Context) {
             repository.saveCategoryCovers(categoryCovers)
         }
 
-        runCatching { DayWidgetProvider.requestUpdate(appContext) }
-        runCatching { MonthCalendarWidgetProvider.requestUpdate(appContext) }
+        runBestEffort("refresh day widget after category deletion") {
+            DayWidgetProvider.requestUpdate(appContext)
+        }
+        runBestEffort("refresh calendar widget after category deletion") {
+            MonthCalendarWidgetProvider.requestUpdate(appContext)
+        }
         releaseImageFilesIfUnreferenced(previousCoverFiles)
         return changed || previousCoverFiles.isNotEmpty()
     }
@@ -424,13 +427,25 @@ class TheDayState(context: Context) {
             }
     }
 
+    private fun runBestEffort(operation: String, block: () -> Unit) {
+        try {
+            block()
+        } catch (exception: Exception) {
+            Log.w(TAG, "Best-effort operation failed: $operation", exception)
+        }
+    }
+
     private fun releaseImageFilesIfUnreferenced(fileNames: Set<String>) {
         fileNames.forEach { fileName ->
             if (!isImageReferenced(fileName)) {
-                runCatching {
+                runBestEffort("delete unreferenced image $fileName") {
                     imageStore.deleteImage(fileName)
                 }
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "TheDayState"
     }
 }

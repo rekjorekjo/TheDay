@@ -1,6 +1,7 @@
 package io.github.thedayapp.data
 
 import android.content.Context
+import android.util.Log
 import io.github.thedayapp.domain.normalizedCategoryName
 import org.json.JSONArray
 import org.json.JSONObject
@@ -12,6 +13,7 @@ class DayRepository(context: Context) {
 
     fun loadEvents(): List<DayEvent> {
         val raw = preferences.getString(KEY_EVENTS, null) ?: return emptyList()
+        // 本地事件按条解析：单条记录损坏时跳过该条，避免影响其余可恢复的数据。
         return runCatching {
             val array = JSONArray(raw)
             buildList {
@@ -42,11 +44,15 @@ class DayRepository(context: Context) {
                                 System.currentTimeMillis(),
                             ),
                         )
+                    }.onFailure { exception ->
+                        Log.w(TAG, "Skipping malformed event at index $index", exception)
                     }.getOrNull()
                         ?.takeIf { it.title.isNotBlank() }
                         ?.let(::add)
                 }
             }
+        }.onFailure { exception ->
+            Log.w(TAG, "Failed to load events", exception)
         }.getOrDefault(emptyList())
     }
 
@@ -77,6 +83,7 @@ class DayRepository(context: Context) {
 
     fun loadMilestones(): List<DayMilestone> {
         val raw = preferences.getString(KEY_MILESTONES, null) ?: return emptyList()
+        // 纪念碑数据同样按条容错，保留能够正常解析的记录。
         return runCatching {
             val array = JSONArray(raw)
             buildList {
@@ -93,11 +100,15 @@ class DayRepository(context: Context) {
                                 System.currentTimeMillis(),
                             ),
                         )
+                    }.onFailure { exception ->
+                        Log.w(TAG, "Skipping malformed milestone at index $index", exception)
                     }.getOrNull()
                         ?.takeIf { it.title.isNotBlank() }
                         ?.let(::add)
                 }
             }
+        }.onFailure { exception ->
+            Log.w(TAG, "Failed to load milestones", exception)
         }.getOrDefault(emptyList())
     }
 
@@ -119,6 +130,7 @@ class DayRepository(context: Context) {
 
     fun loadAlbums(): List<DayAlbum> {
         val raw = preferences.getString(KEY_ALBUMS, null) ?: return emptyList()
+        // 纪念册引用的日子可能已被删除，加载阶段只负责恢复结构，关联关系由状态层再校正。
         return runCatching {
             val array = JSONArray(raw)
             buildList {
@@ -149,11 +161,15 @@ class DayRepository(context: Context) {
                                 System.currentTimeMillis(),
                             ),
                         )
+                    }.onFailure { exception ->
+                        Log.w(TAG, "Skipping malformed album at index $index", exception)
                     }.getOrNull()
                         ?.takeIf { it.title.isNotBlank() }
                         ?.let(::add)
                 }
             }
+        }.onFailure { exception ->
+            Log.w(TAG, "Failed to load albums", exception)
         }.getOrDefault(emptyList())
     }
 
@@ -177,6 +193,7 @@ class DayRepository(context: Context) {
     }
     fun loadSettings(): AppSettings {
         val raw = preferences.getString(KEY_SETTINGS, null) ?: return AppSettings()
+        // 设置项兼容旧版本字段；整体解析失败时回退默认配置，保证应用仍可启动。
         return runCatching {
             val json = JSONObject(raw)
             val sortMode = enumValueOrDefault(
@@ -213,10 +230,11 @@ class DayRepository(context: Context) {
                 dynamicEdgeReflection = json.optBoolean("dynamicEdgeReflection", true),
                 sortMode = sortMode,
                 sortDirection = sortDirection,
-                showPastEvents = json.optBoolean("showPastEvents", true),
                 reminderHour = json.optInt("reminderHour", 9).coerceIn(0, 23),
                 reminderMinute = json.optInt("reminderMinute", 0).coerceIn(0, 59),
             )
+        }.onFailure { exception ->
+            Log.w(TAG, "Failed to load settings; using defaults", exception)
         }.getOrDefault(AppSettings())
     }
 
@@ -231,7 +249,6 @@ class DayRepository(context: Context) {
             .put("dynamicEdgeReflection", settings.dynamicEdgeReflection)
             .put("sortMode", settings.sortMode.name)
             .put("sortDirection", settings.sortDirection.name)
-            .put("showPastEvents", settings.showPastEvents)
             .put("reminderHour", settings.reminderHour)
             .put("reminderMinute", settings.reminderMinute)
         preferences.edit().putString(KEY_SETTINGS, json.toString()).apply()
@@ -243,6 +260,7 @@ class DayRepository(context: Context) {
 
     fun loadNewEventDraft(): NewEventDraft? {
         val raw = preferences.getString(KEY_NEW_EVENT_DRAFT, null) ?: return null
+        // 草稿只用于恢复未完成编辑，损坏时直接忽略，不阻塞正式事件数据加载。
         return runCatching {
             val json = JSONObject(raw)
             NewEventDraft(
@@ -264,6 +282,8 @@ class DayRepository(context: Context) {
                     json.optJSONObject("backgroundImage"),
                 ),
             )
+        }.onFailure { exception ->
+            Log.w(TAG, "Failed to load new-event draft", exception)
         }.getOrNull()
     }
 
@@ -405,6 +425,7 @@ class DayRepository(context: Context) {
     fun loadCategoryCovers(): Map<String, LocalImageReference> {
         val raw = preferences.getString(KEY_CATEGORY_COVERS, null)
             ?: return emptyMap()
+        // 分类封面仅恢复通过文件名和尺寸校验的图片引用，异常数据不进入运行状态。
 
         return runCatching {
             val array = JSONArray(raw)
@@ -430,6 +451,8 @@ class DayRepository(context: Context) {
             }
 
             covers.toMap()
+        }.onFailure { exception ->
+            Log.w(TAG, "Failed to load category covers", exception)
         }.getOrDefault(emptyMap())
     }
 
@@ -471,6 +494,7 @@ class DayRepository(context: Context) {
         enumValues<T>().firstOrNull { it.name == raw } ?: default
 
     companion object {
+        private const val TAG = "DayRepository"
         const val PREFS_NAME = "the_day_store"
         private const val KEY_EVENTS = "events_json"
         private const val KEY_SETTINGS = "settings_json"

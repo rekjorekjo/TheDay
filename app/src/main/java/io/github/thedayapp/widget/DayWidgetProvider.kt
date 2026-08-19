@@ -188,10 +188,7 @@ class DayWidgetProvider : AppWidgetProvider() {
                     appWidgetId = appWidgetId,
                 )
             }
-            val visibleEvents = allEvents.filter { event ->
-                settings.showPastEvents ||
-                    DayMath.signedDays(event, today) >= 0
-            }
+            val visibleEvents = allEvents
             val event = assignedEvent
                 ?: EventOrdering.heroEvent(visibleEvents, today)
 

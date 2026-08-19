@@ -1,9 +1,7 @@
 package io.github.thedayapp.sharing
 
 /**
- * Native export counterpart of the Flutter Liquid Glass ambience.
- * A non-null instance means the renderer must use Glass visuals instead of
- * the Classic decorative templates.
+ * Flutter Liquid Glass 在原生导出渲染中的样式参数。非空时使用 Glass 视觉而非 Classic 装饰模板。
  */
 data class GlassExportStyle(
     val primary: Int,

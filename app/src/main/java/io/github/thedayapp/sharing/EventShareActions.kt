@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import androidx.core.content.FileProvider
 import io.github.thedayapp.R
 import kotlinx.coroutines.CancellationException
@@ -22,6 +23,7 @@ import java.io.IOException
 import kotlin.coroutines.resume
 
 object EventShareActions {
+    private const val TAG = "EventShareActions"
     private const val SHARED_IMAGE_DIRECTORY = "shared_images"
     private const val SHARED_IMAGE_MAX_AGE_MILLIS = 24L * 60L * 60L * 1000L
 
@@ -44,7 +46,7 @@ object EventShareActions {
                 val sendIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/png"
                     putExtra(Intent.EXTRA_STREAM, contentUri)
-                    clipData = ClipData.newRawUri("The Day", contentUri)
+                    clipData = ClipData.newRawUri("此日", contentUri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
 
@@ -97,7 +99,7 @@ object EventShareActions {
                     val sendIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "image/png"
                         putExtra(Intent.EXTRA_STREAM, contentUri)
-                        clipData = ClipData.newRawUri("The Day", contentUri)
+                        clipData = ClipData.newRawUri("此日", contentUri)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     launchChooser(
@@ -114,7 +116,7 @@ object EventShareActions {
                         type = "image/png"
                         putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(contentUris))
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        clipData = ClipData.newUri(context.contentResolver, "The Day", contentUris.first())
+                        clipData = ClipData.newUri(context.contentResolver, "此日", contentUris.first())
                         contentUris.drop(1).forEach { uri ->
                             clipData?.addItem(ClipData.Item(uri))
                         }
@@ -206,8 +208,10 @@ object EventShareActions {
 
             return uri
         } catch (exception: Exception) {
-            runCatching {
+            try {
                 resolver.delete(uri, null, null)
+            } catch (cleanupError: Exception) {
+                Log.w(TAG, "Failed to remove incomplete gallery entry", cleanupError)
             }
             throw exception
         }
@@ -264,7 +268,9 @@ object EventShareActions {
                 }
             }
         } catch (exception: Exception) {
-            outputFile.delete()
+            if (outputFile.exists() && !outputFile.delete()) {
+                Log.w(TAG, "Failed to remove incomplete legacy gallery image")
+            }
             throw exception
         }
     }
@@ -288,8 +294,8 @@ object EventShareActions {
 
         val expiry = System.currentTimeMillis() - SHARED_IMAGE_MAX_AGE_MILLIS
         directory.listFiles()?.forEach { file ->
-            if (file.isFile && file.lastModified() < expiry) {
-                file.delete()
+            if (file.isFile && file.lastModified() < expiry && !file.delete()) {
+                Log.d(TAG, "Expired share image could not be deleted: ${file.name}")
             }
         }
 

@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 
-/** Requests POST_NOTIFICATIONS once, only on a fresh Android 13+ install. */
+/** 仅在 Android 13 及以上的首次安装启动时请求一次通知权限。 */
 object InitialNotificationPermission {
     private const val PREFS = "initial_permissions"
     private const val KEY_NOTIFICATION_REQUESTED = "notification_requested"
@@ -22,9 +22,12 @@ object InitialNotificationPermission {
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (prefs.getBoolean(KEY_NOTIFICATION_REQUESTED, false)) return false
 
-        val packageInfo = runCatching {
+        val packageInfo = try {
             activity.packageManager.getPackageInfo(activity.packageName, 0)
-        }.getOrNull() ?: return false
+        } catch (_: PackageManager.NameNotFoundException) {
+            // 无法确认是否为首次安装时不主动弹权限框，避免误打扰用户。
+            return false
+        }
 
         return packageInfo.firstInstallTime == packageInfo.lastUpdateTime
     }

@@ -474,9 +474,7 @@ class _SnowScenePainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // Keep the trajectory mathematically periodic so AnimationController.repeat()
-    // can wrap from 1.0 back to 0.0 without replacing the whole snow field.
-    // Each flake only recycles after it has moved outside the visible viewport.
+    // 轨迹保持数学周期性，让 AnimationController.repeat() 回绕时无需重建雪场；雪花离开可视区域后再循环。
     final farRng = math.Random(0x5F21);
     final farSpan = h + 40.0;
     for (var i = 0; i < 48; i++) {
@@ -1196,8 +1194,7 @@ class GlassSurface extends StatelessWidget {
             ),
           ),
         ),
-        // Keep colour reflection at the rim. A directional gradient across the
-        // full card made the entire control look illuminated rather than glassy.
+        // 色彩反射只保留在边缘，避免整张卡片被方向渐变照亮而失去玻璃质感。
         Padding(padding: padding, child: child),
         Positioned.fill(
           child: IgnorePointer(
@@ -1221,9 +1218,7 @@ class GlassSurface extends StatelessWidget {
       child: interior,
     );
 
-    // Keep the depth shadow outside the clip. In the old structure the entire
-    // surface, including its shadow, was clipped by ClipRRect, which flattened
-    // cards against the moving ambience behind them.
+    // 景深阴影放在裁剪区域外，避免 ClipRRect 连同阴影一起裁掉后让卡片显得扁平。
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: borderRadius,
@@ -1272,9 +1267,7 @@ class _GlassDepthPainter extends CustomPainter {
         .clamp(0.0, 1.0)
         .toDouble();
 
-    // Liquid Glass is kept optically quiet in the centre. The refractive cue is
-    // built from a few sub-2.5 px rings only, so cards retain the r15 depth
-    // without turning into large illuminated buttons.
+    // Liquid Glass 中央区域保持克制，只用数层小于 2.5px 的边缘环表现折射和厚度。
     final outer = RRect.fromRectAndRadius(
       rect.deflate(0.52),
       Radius.circular(math.max(0.0, radius - 0.52)),
@@ -1295,8 +1288,7 @@ class _GlassDepthPainter extends CustomPainter {
       );
     canvas.drawRRect(outer, outerPaint);
 
-    // A second narrow optical ring gives the edge a lens-like "swollen" feel.
-    // It is static and intentionally never reaches the card fill.
+    // 第二层窄光学环用于表现镜片式鼓起边缘，保持静态且不延伸到卡片填充区域。
     final refractRect = rect.deflate(1.28);
     if (refractRect.width > 0 && refractRect.height > 0) {
       final refract = RRect.fromRectAndRadius(
@@ -1323,8 +1315,7 @@ class _GlassDepthPainter extends CustomPainter {
       canvas.drawRRect(refract, refractPaint);
     }
 
-    // Inner transmission rim: a tiny bright upper/left edge and a darker
-    // lower/right edge make the glass read as thickness rather than a flat line.
+    // 内侧透射边：左上略亮、右下略暗，用微弱明暗差表现玻璃厚度而不是一条平面描边。
     final innerRect = rect.deflate(1.88);
     if (innerRect.width > 0 && innerRect.height > 0) {
       final inner = RRect.fromRectAndRadius(

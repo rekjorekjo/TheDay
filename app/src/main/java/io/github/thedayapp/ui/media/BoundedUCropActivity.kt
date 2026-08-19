@@ -15,13 +15,8 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * uCrop activity with a small, app-local interaction patch.
- *
- * Upstream freestyle mode limits the crop rectangle to the overlay view. On a
- * narrow image that can still let a crop corner enter the empty area outside
- * the transformed bitmap. This activity adds a transparent touch guard above
- * uCrop's normal overlay and clamps every corner/move gesture to the bitmap's
- * current transformed quadrilateral before forwarding it to uCrop.
+ * 对 uCrop 自由裁剪交互做应用内补丁：窄图时把角点和移动手势限制在当前变换后的图片四边形内，
+ * 再转发给 uCrop，避免裁剪框进入图片外的空白区域。
  */
 class BoundedUCropActivity : UCropActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -380,8 +380,7 @@ fun EventCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Warm the shared image cache while the row is visible. The list itself
-    // remains text-only, but opening the detail screen can reuse this decode.
+    // 列表仍只显示文字，但在条目可见时预热共享图片缓存，进入详情页可直接复用解码结果。
     rememberLocalImageBitmap(
         image = event.backgroundImage,
         maxDecodeLongEdgePx = 1280,

@@ -11,8 +11,8 @@
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 49,
-      "versionName": "3.2.1",
+      "versionCode": 50,
+      "versionName": "3.3.0",
       "outputFile": "app-glass-release.apk"
     }
   ],

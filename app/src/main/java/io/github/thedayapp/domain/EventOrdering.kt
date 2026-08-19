@@ -33,6 +33,7 @@ object EventOrdering {
 
     private fun createSmartComparator(direction: SortDirection, today: LocalDate): Comparator<DayEvent> {
         return Comparator { e1, e2 ->
+            // 智能排序先区分未来与已过去事件，再按距今天数比较，避免两组日期交叉。
             val group1 = if (DayMath.signedDays(e1, today) >= 0) 0 else 1
             val group2 = if (DayMath.signedDays(e2, today) >= 0) 0 else 1
             val groupCompare = group1.compareTo(group2)
@@ -57,33 +58,33 @@ object EventOrdering {
         return Comparator { e1, e2 ->
             val date1 = DayMath.effectiveDate(e1, today)
             val date2 = DayMath.effectiveDate(e2, today)
-            val result = date1.compareTo(date2)
+            val comparison = date1.compareTo(date2)
             if (direction == SortDirection.DESCENDING) {
-                -result
+                -comparison
             } else {
-                result
+                comparison
             }
         }
     }
 
     private fun createTitleComparator(direction: SortDirection): Comparator<DayEvent> {
         return Comparator { e1, e2 ->
-            val result = e1.title.lowercase(Locale.getDefault()).compareTo(e2.title.lowercase(Locale.getDefault()))
+            val comparison = e1.title.lowercase(Locale.getDefault()).compareTo(e2.title.lowercase(Locale.getDefault()))
             if (direction == SortDirection.DESCENDING) {
-                -result
+                -comparison
             } else {
-                result
+                comparison
             }
         }
     }
 
     private fun createCreatedComparator(direction: SortDirection): Comparator<DayEvent> {
         return Comparator { e1, e2 ->
-            val result = e1.createdAtEpochMillis.compareTo(e2.createdAtEpochMillis)
+            val comparison = e1.createdAtEpochMillis.compareTo(e2.createdAtEpochMillis)
             if (direction == SortDirection.DESCENDING) {
-                -result
+                -comparison
             } else {
-                result
+                comparison
             }
         }
     }

@@ -64,9 +64,7 @@ class AppUpdateManager(context: Context) {
         val assetName = preferences.pendingAssetName
 
         if (downloadId != null) {
-            runCatching {
-                downloadManager.remove(downloadId)
-            }
+            removeDownloadQuietly(downloadId, "obsolete update")
         }
 
         val downloadDirectory = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
@@ -89,13 +87,19 @@ class AppUpdateManager(context: Context) {
 
     private fun markDownloadFailed(downloadId: Long?) {
         if (downloadId != null) {
-            runCatching {
-                downloadManager.remove(downloadId)
-            }
+            removeDownloadQuietly(downloadId, "failed update")
         }
 
         preferences.clearPendingUpdate()
         preferences.downloadFailed = true
+    }
+
+    private fun removeDownloadQuietly(downloadId: Long, reason: String) {
+        try {
+            downloadManager.remove(downloadId)
+        } catch (exception: RuntimeException) {
+            Log.w(TAG, "Failed to remove $reason download id=$downloadId", exception)
+        }
     }
 
     private fun parseSemanticVersion(value: String): Triple<Int, Int, Int>? {
@@ -129,9 +133,8 @@ class AppUpdateManager(context: Context) {
         )
 
     /**
-     * A failed DownloadManager request is persisted so the UI can report it,
-     * but it must not poison later manual checks. Clear only that stale failed
-     * download before the user explicitly retries/checks again.
+     * DownloadManager 失败状态会持久化供界面展示，但手动重试前只清理这条过期失败记录，
+     * 避免旧状态影响后续正常检查。
      */
     fun resetFailedDownloadForManualCheck() {
         if (currentStatus().state != UpdateDownloadState.FAILED) return
@@ -140,7 +143,7 @@ class AppUpdateManager(context: Context) {
         val failedAssetName = preferences.pendingAssetName
 
         if (failedDownloadId != null) {
-            runCatching { downloadManager.remove(failedDownloadId) }
+            removeDownloadQuietly(failedDownloadId, "stale failed update")
         }
 
         val downloadDirectory = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
@@ -156,11 +159,8 @@ class AppUpdateManager(context: Context) {
     }
 
     /**
-     * Classic -> Glass is an edition replacement, not a data import. Glass uses
-     * the same application id and signing key, so Android keeps the existing
-     * app-private data. Equal version codes are valid for an Android update and
-     * are intentionally accepted here so a Classic 3.0.0 build can switch to
-     * the Glass 3.0.0 build without manufacturing a fake version bump.
+     * Classic -> Glass 属于同一应用的 Edition 替换，不是数据导入。两者共用 applicationId 和签名，
+     * 因此允许相同 versionCode 的 Edition 切换并保留应用私有数据。
      */
     suspend fun checkForGlassUpgrade(): UpdateCheckResult {
         if (BuildConfig.EDITION == "glass") return UpdateCheckResult.UpToDate
@@ -240,15 +240,11 @@ class AppUpdateManager(context: Context) {
             }
 
             if (downloadFailed) {
-                runCatching {
-                    downloadManager.remove(existingDownloadId)
-                }
+                removeDownloadQuietly(existingDownloadId, "failed replacement download")
                 preferences.clearPendingUpdate()
             }
         } else if (existingDownloadId != null) {
-            runCatching {
-                downloadManager.remove(existingDownloadId)
-            }
+            removeDownloadQuietly(existingDownloadId, "superseded update")
 
             val oldDownloadDirectory = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
 
@@ -287,7 +283,7 @@ class AppUpdateManager(context: Context) {
             if (release.apkAssetName.startsWith("TheDay-Glass-")) "glass" else "classic"
 
         val request = DownloadManager.Request(Uri.parse(release.apkDownloadUrl))
-            .setTitle("The Day ${release.versionName}")
+            .setTitle("此日 ${release.versionName}")
             .setDescription(appContext.getString(R.string.app_name))
             .setDestinationInExternalFilesDir(appContext, Environment.DIRECTORY_DOWNLOADS, release.apkAssetName)
             .setAllowedOverMetered(!preferences.wifiOnly)

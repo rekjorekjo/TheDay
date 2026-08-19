@@ -24,7 +24,7 @@ class ExportScreen extends StatefulWidget {
 class _ExportScreenState extends State<ExportScreen> {
   final selected = <String>{};
   final orderedSelected = <String>[];
-  final titleController = TextEditingController(text: 'The Day');
+  final titleController = TextEditingController(text: '此日');
   _ExportStep step = _ExportStep.select;
   bool selectionMode = false;
   String? workingAction;
@@ -66,7 +66,8 @@ class _ExportScreenState extends State<ExportScreen> {
         mode: mode,
       );
       if (mounted) setState(() => estimatedPages = count);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('估算导出页数失败: $error');
       if (mounted) setState(() => estimatedPages = 0);
     }
   }
@@ -87,7 +88,8 @@ class _ExportScreenState extends State<ExportScreen> {
           const SnackBar(content: Text('已保存到相册')),
         );
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('导出日子失败: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('导出失败')),

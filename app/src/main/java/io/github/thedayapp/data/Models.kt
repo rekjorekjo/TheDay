@@ -65,10 +65,9 @@ enum class ImagePlacementTarget {
 }
 
 /**
- * [fileName] points to the currently selected image range used by the UI.
- * [originalFileName] points to the retained uncropped source used when the
- * user chooses “重新裁剪”. The two screen transforms are non-destructive and
- * only describe how that image is framed inside each card.
+ * [fileName] 指向当前界面使用的图片文件。
+ * [originalFileName] 保留未裁切原图，供“重新裁剪”继续使用；
+ * 两套 transform 只记录首页卡片和详情卡片的非破坏式构图参数。
  */
 data class LocalImageReference(
     val fileName: String,
@@ -148,7 +147,6 @@ data class AppSettings(
     val dynamicEdgeReflection: Boolean = true,
     val sortMode: SortMode = SortMode.SMART,
     val sortDirection: SortDirection = SortDirection.ASCENDING,
-    val showPastEvents: Boolean = true,
     val reminderHour: Int = 9,
     val reminderMinute: Int = 0,
 )
